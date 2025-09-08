@@ -1,7 +1,7 @@
-site_name: template
+site_name: chromstream
 site_author: YourName
 site_description: >-
-  This is the template package!
+  This is the chromstream package!
 nav:
   - Home: index.md
   - Overview:
@@ -27,10 +27,9 @@ nav:
   - Code Documentation: reference/ # keep me!
   - About:
       - example_docs/about/changelog.md
-      - example_docs/about/conduct.md
       - example_docs/about/license.md
 
-repo_url: https://github.com/Quantum-Accelerators/template/
+repo_url: https://github.com/Quantum-Accelerators/chromstream/
 edit_uri: blob/main/docs/
 
 theme:

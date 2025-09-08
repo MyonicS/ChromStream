@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "template"
+name = "chromstream"
 description="A Python package description goes here."
 version = "0.0.1"
 readme = "README.md"
@@ -25,7 +25,11 @@ classifiers = [
     "Operating System :: MacOS",
 ]
 requires-python = ">=3.9"
-dependencies = ["numpy"]
+dependencies = [
+    "ipykernel>=6.30.1",
+    "numpy",
+    "pandas>=2.3.2",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4.0", "pytest-cov>=3.0.0", "ruff>=0.0.285"]
@@ -39,15 +43,15 @@ docs = [
 ]
 
 [project.urls]
-repository = "https://github.com/Quantum-Accelerators/template"
-documentation = "https://quantum-accelerators.github.io/template/"
-changelog = "https://github.com/Quantum-Accelerators/template/blob/main/CHANGELOG.md"
+repository = "https://github.com/Quantum-Accelerators/chromstream"
+documentation = "https://quantum-accelerators.github.io/chromstream/"
+changelog = "https://github.com/Quantum-Accelerators/chromstream/blob/main/CHANGELOG.md"
 
 [tool.setuptools.package-data]
-template = ["py.typed"]
+chromstream = ["py.typed"]
 
 [tool.pyright]
-include = ["template"]
+include = ["chromstream"]
 exclude = ["**/__pycache__"]
 
 [tool.pytest.ini_options]
@@ -129,15 +133,15 @@ lint.ignore = [
   "RET505", # Unnecessary `elif` after `return`
   "PLC0415", # `import` should be at the top-level of a file
 ]
-src = ["src"]
 lint.unfixable = [
   "T20",  # Removes print statements
   "F841", # Removes unused variables
 ]
 lint.pydocstyle.convention = "numpy"
-lint.isort.known-first-party = ["template"]
+lint.isort.known-first-party = ["chromstream"]
 lint.isort.required-imports = ["from __future__ import annotations"]
 lint.isort.split-on-trailing-comma=false
+src = ["src"]
 extend-include = ["*.ipynb"]
 
 [tool.ruff.format]

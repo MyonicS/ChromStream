@@ -67,3 +67,12 @@ env/
 ENV/
 env.bak/
 venv.bak/
+
+
+# dev data
+
+/dev_data
+
+# dev notebook
+
+dev_notebook.ipynb
