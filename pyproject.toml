@@ -27,6 +27,7 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "ipykernel>=6.30.1",
+    "matplotlib>=3.9.4",
     "numpy",
     "pandas>=2.3.2",
 ]
@@ -103,14 +104,12 @@ lint.select = [
   "ICN",    # flake8-import-conventions
   "INT",    # flake8-gettext
   "ISC",    # flake8-implicit-str-concat
-  "LOG",    # flake8-logging
   "NPY",    # numpy-specific rules
   "PD",     # pandas-vet
   "PERF",   # perflint
   "PIE",    # flake8-pie
   "PL",     # pylint
   "PT",     # flake8-pytest-style
-  "PTH",    # flake8-use-pathlib
   "PYI",    # flake8-pyi
   "Q",      # flake8-quotes
   "RET",    # flake8-return
@@ -132,6 +131,7 @@ lint.ignore = [
   "PERF203",  # try-except-in-loop
   "RET505", # Unnecessary `elif` after `return`
   "PLC0415", # `import` should be at the top-level of a file
+  "I001",
 ]
 lint.unfixable = [
   "T20",  # Removes print statements
@@ -162,3 +162,5 @@ namespace_packages = true
 explicit_package_bases = true
 no_implicit_optional = false
 disable_error_code = "annotation-unchecked"
+
+lint.quotes = "double"
