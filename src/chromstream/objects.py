@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -18,17 +17,48 @@ class Chromatogram:
     channel: str
     path: Path | str
 
-    def plot(self, ax=None, **kwargs):
+    def plot(self, ax=None, column=None, **kwargs):
         """Plot the chromatogram data"""
         if ax is None:
             fig, ax = plt.subplots()
 
-        ax.plot(self.data["Time (min)"], self.data[self.data.columns[1]], **kwargs)
-        ax.set_xlabel("Time (min)")
-        ax.set_ylabel(self.data.columns[1])
+        # Choose which column to plot (default to second column)
+        y_column = self.data.columns[1] if column is None else column
+        x_column = self.data.columns[0]
+
+        ax.plot(self.data[x_column], self.data[y_column], **kwargs)
+        ax.set_xlabel(x_column)
+        ax.set_ylabel(y_column)
         ax.set_title(f"Chromatogram - {self.channel} - {self.path}")
 
         return ax
+
+    def apply_baseline(
+        self, correction_func, inplace=False, suffix="_BLcorr", **kwargs
+    ):
+        """
+        Apply baseline correction to the chromatogram data
+
+        Args:
+            correction_func: Function that takes a pandas DataFrame and returns corrected Series
+            inplace (bool): If True, modify the original data. If False, add new column
+            suffix (str): Suffix to add to the new column name when inplace=False
+
+        Returns:
+            pd.DataFrame: The corrected data (same as self.data if inplace=True)
+        """
+        signal_column = self.data.columns[1]  # Second column (signal data)
+
+        # Apply the correction function - passes entire DataFrame
+        corrected_signal = correction_func(self.data, **kwargs)
+
+        if inplace:
+            self.data[signal_column] = corrected_signal
+        else:
+            new_column_name = signal_column + suffix
+            self.data[new_column_name] = corrected_signal
+
+        return self.data
 
 
 @dataclass
@@ -51,21 +81,21 @@ class ChannelChromatograms:
 
         for inj_num, chrom in self.chromatograms.items():
             ax.plot(
-                chrom.data["Time (min)"],
+                chrom.data[chrom.data.columns[0]],
                 chrom.data[chrom.data.columns[1]],
                 label=f"Injection {inj_num}",
                 color=colors[inj_num],
                 **kwargs,
             )
 
-        ax.set_xlabel("Time (min)")
-        ax.set_ylabel(self.chromatograms[0].data.columns[1])
+        ax.set_xlabel(chrom.data.columns[0])  # type: ignore
+        ax.set_ylabel(chrom.data.columns[1])  # type: ignore
         ax.set_title(f"Channel: {self.channel}")
         # add colorbar
         if plot_colorbar:
             sm = plt.cm.ScalarMappable(
                 norm=Normalize(vmin=0, vmax=len(self.chromatograms) - 1)
-            )  # type: ignore
+            )
             sm.set_array([])
             cbar = plt.colorbar(sm, ax=ax)
             cbar.set_label("Injection Number")
@@ -79,18 +109,22 @@ class Experiment:
 
     name: str
     channels: dict[str, ChannelChromatograms] = field(default_factory=dict)
-    experiment_startime: Optional[pd.Timestamp] = None
-    experiment_endtime: Optional[pd.Timestamp] = None
-    log: Optional[pd.DataFrame] = None
+    experiment_startime: pd.Timestamp | None = None
+    experiment_endtime: pd.Timestamp | None = None
+    log: pd.DataFrame | None = None
+
+    # Methods
+    @property
+    def channel_names(self) -> list[str]:
+        """Get a list of channel names in the experiment"""
+        return list(self.channels.keys())
 
     def add_channel(self, channel_name: str, channel_data: ChannelChromatograms):
         """Add a channel to the experiment"""
         self.channels[channel_name] = channel_data
 
     def add_chromatogram(
-        self,
-        chromatogram: Path | str | Chromatogram,
-        channel_name: Optional[str] = None,
+        self, chromatogram: Path | str | Chromatogram, channel_name: str | None = None
     ):
         """Add a chromatogram to the experiment, automatically creating the channel if it does not exist
 
