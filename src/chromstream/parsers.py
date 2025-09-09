@@ -80,28 +80,44 @@ def parse_chromeleon_txt(file_path: str | Path) -> tuple[dict[str, str], pd.Data
 
     # reading chromatogram data
     if chromatogram_data_start is not None:
+        # Check first data line to determine number format
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+
+        first_data_line = lines[chromatogram_data_start].strip()
+        comma_decimal_format = "," in first_data_line
+
+        if comma_decimal_format:
+            # European format: comma as decimal, dot as thousands
+            converters = {
+                "Time (min)": lambda x: float(str(x).replace(".", "").replace(",", "."))
+                if pd.notna(x) and x != ""
+                else float("nan"),
+                f"Value ({signal_unit})": lambda x: float(
+                    str(x).replace(".", "").replace(",", ".")
+                )
+                if pd.notna(x) and x != ""
+                else float("nan"),
+            }
+        else:
+            # Standard format: dot as decimal, comma as thousands
+            converters = {
+                "Time (min)": lambda x: float(str(x).replace(",", ""))
+                if pd.notna(x) and x != ""
+                else float("nan"),
+                f"Value ({signal_unit})": lambda x: float(str(x).replace(",", ""))
+                if pd.notna(x) and x != ""
+                else float("nan"),
+            }
+
         chromatogram_df = pd.read_csv(
             file_path,
             sep="	",
             skiprows=chromatogram_data_start,
             names=["Time (min)", "Step (s)", f"Value ({signal_unit})"],
             na_values=["n.a."],
-            usecols=[
-                "Time (min)",
-                f"Value ({signal_unit})",
-            ],  # makes it not read the Step column
-            converters={
-                "Time (min)": lambda x: float(
-                    x.replace(".", "").replace(",", ".")
-                    if "," in x and "." in x
-                    else x.replace(",", "")
-                ),
-                f"Value ({signal_unit})": lambda x: float(
-                    x.replace(".", "").replace(",", ".")
-                    if "," in x and "." in x
-                    else x.replace(",", "")
-                ),
-            },
+            usecols=["Time (min)", f"Value ({signal_unit})"],
+            converters=converters,
         )
     else:
         log.warning(f"Chromatogram data section not found for {file_path}.")
