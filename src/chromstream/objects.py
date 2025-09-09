@@ -81,6 +81,7 @@ class Experiment:
     channels: dict[str, ChannelChromatograms] = field(default_factory=dict)
     experiment_startime: Optional[pd.Timestamp] = None
     experiment_endtime: Optional[pd.Timestamp] = None
+    log: Optional[pd.DataFrame] = None
 
     def add_channel(self, channel_name: str, channel_data: ChannelChromatograms):
         """Add a channel to the experiment"""
@@ -118,7 +119,7 @@ class Experiment:
         injection_num = len(self.channels[channel].chromatograms)
         self.channels[channel].add_chromatogram(injection_num, chrom)
 
-    def plot(self, ax=None, channels: str | list = "all", **kwargs):
+    def plot_chromatograms(self, ax=None, channels: str | list = "all", **kwargs):
         if ax is None:
             n_channels_to_plot = (
                 len(self.channels) if channels == "all" else len(channels)
@@ -139,3 +140,71 @@ class Experiment:
                 self.channels[channel].plot(ax=ax[i], **kwargs)
             else:
                 raise ValueError(f"Channel {channel} not found in experiment.")
+
+    def add_log(self, log: str | Path | pd.DataFrame):
+        """
+        Adds a log dataframe to the experiment, either from a dataframe or from a path to the log file.
+
+        Args:
+            log (str | Path | pd.DataFrame): Path to the log file or a DataFrame
+        """
+        if isinstance(log, (str, Path)):
+            from .parsers import parse_log_file
+
+            self.log = parse_log_file(log)
+        elif isinstance(log, pd.DataFrame):
+            self.log = log
+        else:
+            raise ValueError("log must be a file path or a DataFrame")
+
+    def plot_log(self, columns: str | list, ax=None, use_exp_time=False):
+        """
+        Plots specified colums of the experiment log. If use_exp_time is True, the x-axis will be the time since the start of the experiment in minutes.
+        Args:
+            columns (str | list): Column name or list of column names to plot
+            ax (matplotlib.axes.Axes, optional): Axes to plot on. If None, a new figure and axes will be created.
+            use_exp_time (bool, optional): Whether to use time since start of experiment as x-axis. Defaults to False.
+        """
+
+        if self.log is None:
+            raise ValueError("No log data available to plot.")
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if use_exp_time:
+            if self.experiment_startime is None:
+                raise ValueError(
+                    "Experiment start time is not set. Cannot use experiment time."
+                )
+            x = (
+                pd.to_datetime(self.log["Timestamp"]) - self.experiment_startime
+            ).dt.total_seconds() / 60.0
+            x_label = "Experiment Time (min)"
+        else:
+            x = self.log["Timestamp"]
+            x_label = "Timestamp"
+
+        for col in columns:
+            if col not in self.log.columns:
+                raise ValueError(f"Column {col} not found in log data.")
+            ax.plot(x, self.log[col], label=col)
+
+        ax.set_xlabel(x_label)
+        ax.set_ylabel("Value")
+        ax.set_title("Experiment Log Data")
+        ax.legend()
+
+        return ax
+
+    @property
+    def log_data(self) -> pd.DataFrame:
+        """Get log data, raising an error if not available"""
+        if self.log is None:
+            raise ValueError(
+                "No log data available. Use add_log() to add log data first."
+            )
+        return self.log

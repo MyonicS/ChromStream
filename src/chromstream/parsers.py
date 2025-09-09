@@ -4,7 +4,8 @@ import logging as log
 from pathlib import Path
 from chromstream.objects import Chromatogram
 from chromstream.objects import ChannelChromatograms
-from typing import Optional
+from typing import Optional, Any
+from datetime import datetime
 
 
 def hello() -> str:
@@ -254,3 +255,319 @@ def parse_to_channel(
         channel_chroms.add_chromatogram(i, chrom)
 
     return channel_chroms
+
+
+### Log file parsers
+
+
+def detect_log_type(file_path: str | Path) -> str:
+    """
+    Detect the type of log file based on its structure and content.
+
+    Args:
+        file_path: Path to the log file
+
+    Returns:
+        String indicating the log type ('FT', 'HTHPIR', 'LPIR', 'Robert', 'unknown')
+    """
+    file_path = Path(file_path)
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        lines = [
+            line.strip() for line in content.split("\n")[:20]
+        ]  # Read first 20 lines
+
+    # Check for FT type - has many columns including MFC, valve info
+    if any("MFC" in line and "Valve" in line for line in lines):
+        return "FT"
+
+    # Check for HTHPIR type - has C2H4/CH4 column and specific format
+    if "C2H4/CH4" in content or any("C2H4/CH4" in line for line in lines):
+        return "HTHPIR"
+
+    # Check for LPIR type - has N2-bub column
+    if any("N2-bub" in line for line in lines):
+        return "LPIR"
+
+    # Check for Robert type - has "Power Out %" and "Stirrer" columns
+    if any("Power Out %" in line and "Stirrer" in line for line in lines):
+        return "Robert"
+
+    return "unknown"
+
+
+def parse_metadata_section(lines: list) -> dict[str, Any]:
+    """
+    Parse the metadata section at the top of log files.
+
+    Args:
+        lines: List of lines from the file
+
+    Returns:
+        Dictionary containing metadata
+    """
+    metadata = {}
+
+    for line in lines:
+        if ":" in line and not line.startswith("Date/Time"):
+            # Handle metadata lines like "Name: user" or "Date: 1/17/2023"
+            key, value = line.split(":", 1)
+            metadata[key.strip()] = value.strip()
+        elif line.strip() and not any(char.isdigit() for char in line.split("\t")[0]):
+            # Stop at data lines (which start with dates/times)
+            continue
+        else:
+            break
+
+    return metadata
+
+
+def parse_log_type_ft(file_path: str | Path) -> pd.DataFrame:
+    """
+    Parse FT type log files.
+
+    Args:
+        file_path: Path to the FT log file
+
+    Returns:
+        Parsed DataFrame with metadata as attributes
+    """
+    file_path = Path(file_path)
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f.readlines()]
+
+    # Find where the data starts
+    data_start_idx = None
+    for i, line in enumerate(lines):
+        if line.startswith("Date/Time"):
+            data_start_idx = i
+            break
+
+    if data_start_idx is None:
+        raise ValueError("Could not find data section in FT log file")
+
+    # Parse metadata
+    metadata = parse_metadata_section(lines[:data_start_idx])
+
+    # Read the data using pandas
+    df = pd.read_csv(file_path, sep="\t", skiprows=data_start_idx)
+
+    # Parse datetime
+    df["Timestamp"] = pd.to_datetime(df["Date/Time"], format="%d-%b-%Y %H:%M:%S")
+    df = df.drop("Date/Time", axis=1)
+
+    # Add metadata as attributes
+    df.attrs.update(metadata.items())  # ignore
+
+    return df
+
+
+def parse_log_type_hthpir(file_path: str | Path) -> pd.DataFrame:
+    """
+    Parse HTHPIR type log files.
+
+    Args:
+        file_path: Path to the HTHPIR log file
+
+    Returns:
+        Parsed DataFrame with metadata as attributes
+    """
+    file_path = Path(file_path)
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = [line.rstrip() for line in f.readlines()]  # Keep trailing tabs
+
+    # Find where the data starts - look for actual data rows (start with date)
+    data_start_idx = None
+    header_lines = []
+
+    for i, line in enumerate(lines):
+        # Look for lines that start with a date pattern like "1/17/2023"
+        if re.match(r"^\d{1,2}/\d{1,2}/\d{4}\t", line):
+            data_start_idx = i
+            break
+        # Collect potential header lines that contain column information
+        if (
+            "Date" in line
+            or "Time" in line
+            or "Oven" in line
+            or "N2" in line
+            or "sp" in line
+        ):
+            header_lines.append(line)
+
+    if data_start_idx is None:
+        raise ValueError("Could not find data section in HTHPIR log file")
+
+    # Parse metadata - everything before the data section
+    metadata = parse_metadata_section(lines[:data_start_idx])
+
+    # Manually construct the column names from the header lines
+    # The HTHPIR format has split headers, so we need to reconstruct them
+    column_names = [
+        "Date",
+        "Time",
+        "Oven sp",
+        "Oven temp",
+        "Oven ramp",
+        "N2 sp",
+        "N2 flow",
+        "H2 sp",
+        "H2 flow",
+        "CO2 sp",
+        "CO2 flow",
+        "C2H4/CH4 sp",
+        "C2H4/CH4 flow",
+        "O2 sp",
+        "O2 pv",
+        "Pressure sp",
+        "Pressure pv",
+    ]
+
+    # Read the data section manually
+    data_rows = []
+    for line in lines[data_start_idx:]:
+        if line.strip():  # Skip empty lines
+            row = line.split("\t")
+            data_rows.append(row)
+
+    # Create DataFrame
+    df = pd.DataFrame(data_rows, columns=column_names[: len(data_rows[0])])
+
+    # Convert numeric columns
+    for col in df.columns:
+        if col not in ["Date", "Time"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Combine Date and Time columns - handle AM/PM format
+    df["Timestamp"] = pd.to_datetime(
+        df["Date"].astype(str) + " " + df["Time"].astype(str)
+    )
+    df = df.drop(["Date", "Time"], axis=1)
+
+    # Add metadata as attributes
+    df.attrs.update(metadata.items())
+
+    return df
+
+
+def parse_log_type_lpir(file_path: str | Path) -> pd.DataFrame:
+    """
+    Parse LPIR type log files.
+
+    Args:
+        file_path: Path to the LPIR log file
+
+    Returns:
+        Parsed DataFrame with metadata as attributes
+    """
+    file_path = Path(file_path)
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f.readlines()]
+
+    # Find where the data starts
+    data_start_idx = None
+    for i, line in enumerate(lines):
+        if "Date\tTime" in line:
+            data_start_idx = i
+            break
+
+    if data_start_idx is None:
+        raise ValueError("Could not find data section in LPIR log file")
+
+    # Parse metadata
+    metadata = parse_metadata_section(lines[:data_start_idx])
+
+    # Read the data using pandas
+    df = pd.read_csv(file_path, sep="\t", skiprows=data_start_idx)
+
+    # Combine Date and Time columns
+    df["Timestamp"] = pd.to_datetime(
+        df["Date"].astype(str) + " " + df["Time"].astype(str)
+    )
+    df = df.drop(["Date", "Time"], axis=1)
+
+    # Add metadata as attributes
+    df.attrs.update(metadata.items())  # ignore
+
+    return df
+
+
+def parse_log_type_robert(file_path: str | Path) -> pd.DataFrame:
+    """
+    Parse Robert type log files.
+
+    Args:
+        file_path: Path to the Robert log file
+
+    Returns:
+        Parsed DataFrame with metadata as attributes
+    """
+    file_path = Path(file_path)
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f.readlines()]
+
+    # Find where the data starts
+    data_start_idx = None
+    for i, line in enumerate(lines):
+        if "Date\tTime" in line:
+            data_start_idx = i
+            break
+
+    if data_start_idx is None:
+        raise ValueError("Could not find data section in Robert log file")
+
+    # Parse metadata
+    metadata = parse_metadata_section(lines[:data_start_idx])
+
+    # Read the data using pandas
+    df = pd.read_csv(file_path, sep="\t", skiprows=data_start_idx)
+
+    # Combine Date and Time columns
+    df["Timestamp"] = pd.to_datetime(
+        df["Date"].astype(str) + " " + df["Time"].astype(str)
+    )
+    df = df.drop(["Date", "Time"], axis=1)
+
+    # Add metadata as attributes
+    df.attrs.update(metadata.items())  # ignore
+
+    return df
+
+
+def parse_log_file(file_path: str | Path) -> pd.DataFrame:
+    """
+    Automatically detect and parse any supported log file type. To be extended.
+
+    Args:
+        file_path: Path to the log file
+
+    Returns:
+        Parsed DataFrame with metadata as attributes
+
+    Raises:
+        ValueError: If the file type is not recognized or supported
+    """
+    file_path = Path(file_path)
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    log_type = detect_log_type(file_path)
+
+    if log_type == "FT":
+        return parse_log_type_ft(file_path)
+    elif log_type == "HTHPIR":
+        return parse_log_type_hthpir(file_path)
+    elif log_type == "LPIR":
+        return parse_log_type_lpir(file_path)
+    elif log_type == "Robert":
+        return parse_log_type_robert(file_path)
+    else:
+        raise ValueError(
+            f"Unsupported or unrecognized log file type: {log_type}. Parse the data manually."
+        )
