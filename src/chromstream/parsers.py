@@ -125,6 +125,123 @@ def parse_chromeleon_txt(file_path: str | Path) -> tuple[dict[str, str], pd.Data
     return metadata, chromatogram_df
 
 
+### MTO ASCII parser
+
+
+def parse_MTO_metadata(Path: str | Path) -> dict:
+    """
+    Parses the metadata section from an MTO ASCII file and returns it as a dictionary.
+
+    Args:
+        Path (str | Path): Path to the chromatogram file.
+
+    Returns:
+        dict: Dictionary containing metadata with cleaned keys and processed values.
+    """
+    df_chromatogram_meta = pd.read_csv(
+        Path, sep="\t", header=None, skiprows=0, nrows=13
+    )
+
+    # Convert metadata DataFrame to dictionary
+    metadata = {}
+    for _, row in df_chromatogram_meta.iterrows():
+        if pd.notna(row[0]):
+            # Split on first comma to separate key from values
+            parts = str(row[0]).split(",", 1)
+            if len(parts) == 2:
+                key = parts[0].strip().rstrip(":")
+                value = parts[1].strip()
+                # If there are multiple comma-separated values, keep as string or convert to list
+                if "," in value:
+                    # For values like sampling rates, convert to list of numbers where possible
+                    try:
+                        value_list = [
+                            float(x.strip()) for x in value.split(",") if x.strip()
+                        ]
+                        metadata[key] = (
+                            value_list if len(value_list) > 1 else value_list[0]
+                        )
+                    except ValueError:
+                        # If conversion fails, keep as comma-separated string
+                        metadata[key] = value
+                else:
+                    metadata[key] = value
+
+    return metadata
+
+
+def parse_MTO_asc(Path: str | Path) -> tuple[Chromatogram, Chromatogram, Chromatogram]:
+    """
+    Parses an ASCII file. from the MTO setup. The file contains the chromatograms for all channels under each other.
+
+    Args:
+        Path (str | Path): Path to the chromatogram file.
+
+    Returns:
+        The Chromatogram objects.
+    """
+    # Reads the ascii file of the injection. Splits in into a metadate frame and a frame containing chromatograms of the 3 channels.
+    # Sampling frequency must be equal for all channels.
+
+    df_chromatogram = pd.read_csv(Path, sep="\t", header=None, skiprows=13)
+    metadata = parse_MTO_metadata(Path)
+
+    # split the chromatogram into the different columns. This is achieved by splitting the frame at indexes matching 1/3 and 2/3 of the lenght
+    df_Channel_1 = df_chromatogram.iloc[0 : int(len(df_chromatogram) / 3)].reset_index(
+        drop=True
+    )
+    df_Channel_2 = df_chromatogram.iloc[
+        int(len(df_chromatogram) / 3) : int(2 * len(df_chromatogram) / 3)
+    ].reset_index(drop=True)
+    df_Channel_3 = df_chromatogram.iloc[
+        int(2 * len(df_chromatogram) / 3) : len(df_chromatogram)
+    ].reset_index(drop=True)
+
+    # combine the 3 Channels into one frame, new index
+    df_chromatogram = pd.concat([df_Channel_1, df_Channel_2, df_Channel_3], axis=1)
+    sampling_freqs = [
+        float(x.strip()) for x in metadata["Sampling Rate"].split(",")[0:2]
+    ]
+
+    if len(set(sampling_freqs)) != 1:
+        raise ValueError("The sampling frequencies are not equal")
+
+    sampling_freq = 1 / sampling_freqs[0]  # Hz
+
+    df_chromatogram["Time[s]"] = df_chromatogram.index * sampling_freq
+
+    # set time as index
+    df_chromatogram = df_chromatogram.set_index("Time[s]")
+    df_chromatogram["Time[s]"] = df_chromatogram.index
+
+    # getting injection time
+    inj_time = pd.to_datetime(metadata.get("Acquisition Date and Time", ""))
+
+    df_chromatogram.columns = ["FID_L", "FID_M", "TCD", "Time[s]"]
+    Chromatogram1 = Chromatogram(
+        df_chromatogram[["Time[s]", "FID_L"]],
+        injection_time=inj_time,
+        metadata=metadata,
+        channel="FID_L",
+        path=Path,
+    )
+    Chromatogram2 = Chromatogram(
+        df_chromatogram[["Time[s]", "FID_M"]],
+        injection_time=inj_time,
+        metadata=metadata,
+        channel="FID_M",
+        path=Path,
+    )
+    Chromatogram3 = Chromatogram(
+        df_chromatogram[["Time[s]", "TCD"]],
+        injection_time=inj_time,
+        metadata=metadata,
+        channel="TCD",
+        path=Path,
+    )
+    return Chromatogram1, Chromatogram2, Chromatogram3
+
+
 def parse_inject_time(inject_time: str, metadata: dict) -> pd.Timestamp:
     """
     Parses the injeciton time for chromeleon txt files into a pd.Timestamp object.
