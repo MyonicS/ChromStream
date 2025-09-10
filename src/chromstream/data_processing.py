@@ -10,7 +10,7 @@ from scipy.integrate import trapezoid
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .objects import ChannelChromatograms
+    from .objects import ChannelChromatograms, Chromatogram
 
 
 def min_subtract(data: pd.DataFrame) -> pd.Series:
@@ -124,3 +124,90 @@ def get_temp_and_valves_MTO(Integral_Frame, Log):
 
 
 # To do - seperate integrate chrom function
+
+
+# Splitting
+
+
+def split_chromatogram(
+    chromatogram: Chromatogram,
+    n_injections: int,
+    start_offset: int = 0,
+    end_offset: int = 0,
+    reset_time=True,
+) -> list[Chromatogram]:
+    """
+    When multiple injections are contained in a single chromatogram, this function splits the chromatogram into multiple chromatograms
+    Important constraint is the the length of the chromatogram must be divisible by the number of injections.
+    The injection time of each split chromatogram is adjusted based on the runtime.
+    Note:
+
+    Args:
+        chromatogram (Chromatogram): The chromatogram to be split.
+        n_injections (int): The number of injections to split the chromatogram into.
+        start_offset (int, optional): Number of data points to skip at the start of the chromatogram. Defaults to 0.
+        end_offset (int, optional): Number of data points to skip at the end of the chromatogram. Defaults to 0.
+        reset_time (bool, optional): Whether to reset the time column to start from 0 for each split chromatogram. Defaults to True.
+
+    Returns:
+        list[Chromatogram]: A list of split chromatograms.
+    """
+    end_index = len(chromatogram.data)
+    chrom = (
+        chromatogram.data.iloc[start_offset : (end_index - end_offset)]
+        .reset_index(drop=True)
+        .copy()
+    )
+
+    # Check if divisible by n_injections
+    if len(chrom) % n_injections != 0:
+        raise ValueError(
+            f"Cannot split chromatograms, as length is not divisible by {n_injections}. Padding needs to be implemented."
+        )
+
+    # Calculate split indices, including the end of the data
+    split_indices = [
+        i * (len(chrom) // n_injections) for i in range(1, n_injections)
+    ] + [len(chrom)]
+
+    split_chromatograms = []
+    last_index = 0
+
+    for indx in split_indices:
+        # Slice the data for the current segment
+        data = chrom.iloc[last_index:indx].reset_index(drop=True).copy()
+        last_index = indx
+
+        # Adjust the time column (must be the first column)
+        if chromatogram.time_unit == "min":
+            injection_time = chromatogram.injection_time + pd.Timedelta(
+                minutes=data[data.columns[0]].iloc[0]
+            )
+        elif chromatogram.time_unit == "s":
+            injection_time = chromatogram.injection_time + pd.Timedelta(
+                seconds=data[data.columns[0]].iloc[0]
+            )
+        else:
+            raise ValueError(
+                f"Unknown time unit {chromatogram.time_unit}, cannot split chromatogram."
+            )
+
+        if reset_time:
+            # reset the time column to start from 0
+            data[data.columns[0]] = (
+                data[data.columns[0]] - data[data.columns[0]].iloc[0]
+            )
+
+        # Create a new Chromatogram object for the split segment
+        from .objects import Chromatogram
+
+        split_chromatogram = Chromatogram(
+            data=data,
+            injection_time=injection_time,
+            metadata=chromatogram.metadata,
+            channel=chromatogram.channel,
+            path=chromatogram.path,
+        )
+        split_chromatograms.append(split_chromatogram)
+
+    return split_chromatograms
