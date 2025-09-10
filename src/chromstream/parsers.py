@@ -7,11 +7,6 @@ from chromstream.objects import ChannelChromatograms
 from typing import Optional, Any
 from datetime import datetime
 
-
-def hello() -> str:
-    return "parsers!"
-
-
 # GC txt parsers
 
 
@@ -119,9 +114,14 @@ def parse_chromeleon_txt(file_path: str | Path) -> tuple[dict[str, str], pd.Data
             usecols=["Time (min)", f"Value ({signal_unit})"],
             converters=converters,
         )
+        # adding time units to metadata
+        metadata["time_unit"] = "min"
     else:
         log.warning(f"Chromatogram data section not found for {file_path}.")
         chromatogram_df = pd.DataFrame()
+
+    # adding time unit to the metadata
+
     return metadata, chromatogram_df
 
 
@@ -166,7 +166,8 @@ def parse_MTO_metadata(Path: str | Path) -> dict:
                         metadata[key] = value
                 else:
                     metadata[key] = value
-
+    # adding time unit to metadata
+    metadata["time_unit"] = "s"
     return metadata
 
 
@@ -185,6 +186,9 @@ def parse_MTO_asc(Path: str | Path) -> tuple[Chromatogram, Chromatogram, Chromat
 
     df_chromatogram = pd.read_csv(Path, sep="\t", header=None, skiprows=13)
     metadata = parse_MTO_metadata(Path)
+    # hard coding the signal unit as mV
+    # The metadata contains a field "Y Axis Title"  'mVolts,mVolts,mVolts'
+    metadata["Signal Unit"] = "mV"
 
     # split the chromatogram into the different columns. This is achieved by splitting the frame at indexes matching 1/3 and 2/3 of the lenght
     df_Channel_1 = df_chromatogram.iloc[0 : int(len(df_chromatogram) / 3)].reset_index(
@@ -454,6 +458,41 @@ def parse_metadata_section(lines: list) -> dict[str, Any]:
             break
 
     return metadata
+
+
+def parse_log_MTO(file_path: str | Path) -> pd.DataFrame:
+    Log = pd.read_csv(file_path, sep="\t", skiprows=1)
+    Log = Log[
+        [
+            "Date",
+            "Time",
+            "MFC 1 pv",
+            "MFC 2 pv",
+            "MFC 3 pv",
+            "MFC 4 pv",
+            "Oven Temperature",
+            "v11-reactor",
+            "v10-bubbler",
+            "v12-gc",
+        ]
+    ]
+    # for the v-11 reactor columns, replace all 0 with 'reactor' else 'bypass'
+    Log["v11-reactor"] = Log["v11-reactor"].apply(
+        lambda x: "reactor" if x == 0 else "bypass"
+    )
+    Log.rename(columns={"MFC 1 pv": "N2_flow"}, inplace=True)
+    Log.rename(columns={"MFC 4 pv": "He_Bubbler"}, inplace=True)
+    Log.rename(columns={"MFC 3 pv": "He_Dilution"}, inplace=True)
+    Log["Timestamp"] = pd.to_datetime(
+        Log["Date"] + " " + Log["Time"], format="%m/%d/%Y %I:%M:%S %p"
+    )
+    Log["Timestamp"] = Log.apply(
+        lambda row: datetime.strptime(
+            row["Date"] + " " + row["Time"], "%m/%d/%Y %I:%M:%S %p"
+        ),
+        axis=1,
+    )
+    return Log
 
 
 def parse_log_type_ft(file_path: str | Path) -> pd.DataFrame:

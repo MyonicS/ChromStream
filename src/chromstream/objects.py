@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
+from chromstream.data_processing import integrate_channel
+import logging as log
 
 
 @dataclass
@@ -16,6 +18,24 @@ class Chromatogram:
     metadata: dict
     channel: str
     path: Path | str
+
+    # extra properties
+    @property
+    def time_unit(self) -> str:
+        """Get the time unit from metadata, default to 'min' if not found"""
+        if "time_unit" in self.metadata:
+            return self.metadata["time_unit"]
+        else:
+            log.warning("Time unit not found in metadata")
+            return "unknown"
+
+    @property
+    def signal_unit(self) -> str:
+        if "Signal Unit" in self.metadata:
+            return self.metadata["Signal Unit"]
+        else:
+            log.warning("Signal unit not found in metadata")
+            return "unknown"
 
     def plot(self, ax=None, column=None, **kwargs):
         """Plot the chromatogram data"""
@@ -63,10 +83,24 @@ class Chromatogram:
 
 @dataclass
 class ChannelChromatograms:
-    """All data for a single detector channel"""
+    """
+    Contains data of a single channel with multiple chromatograms
+
+    Args:
+        channel: Name of the channel (e.g., 'FID', 'TCD')
+        chromatograms: Dictionary mapping chromatogram number to Chromatogram objects
+        integrals: DataFrame containing integrated peak areas for each chromatogram (optional)
+
+    Methods:
+        add_chromatogram: Add a chromatogram to the channel
+        plot: Plot all chromatograms in the channel
+        integrate_peaks: Integrate peaks for all chromatograms in the channel, requieres dict of peak limits
+
+    """
 
     channel: str  # 'FID', 'TCD', etc.
     chromatograms: dict[int, Chromatogram] = field(default_factory=dict)
+    integrals: pd.DataFrame | None = None
 
     def add_chromatogram(self, injection_num: int, chromatogram: Chromatogram):
         """Add a chromatogram for a specific injection"""
@@ -102,6 +136,26 @@ class ChannelChromatograms:
 
         return ax
 
+    def integrate_peaks(
+        self, peaklist: dict, column: None | str = None
+    ) -> pd.DataFrame:
+        """
+        Integrate peaks for all chromatograms in the channel
+
+        Args:
+            peaklist: Dictionary defining the peaks to integrate. Example:
+            Peaks_TCD = {"N2": [20, 26], "H2": [16, 19]}
+
+            The list values must be in the same unit as the chromatogram.
+
+            column: Optional column name to use for integration. If None, uses second column.
+
+        Returns:
+            DataFrame with integrated peak areas for each injection
+        """
+        self.integrals = integrate_channel(self, peaklist, column=column)
+        return self.integrals
+
 
 @dataclass
 class Experiment:
@@ -109,7 +163,7 @@ class Experiment:
 
     name: str
     channels: dict[str, ChannelChromatograms] = field(default_factory=dict)
-    experiment_startime: pd.Timestamp | None = None
+    experiment_starttime: pd.Timestamp | None = None
     experiment_endtime: pd.Timestamp | None = None
     log: pd.DataFrame | None = None
 
@@ -162,7 +216,7 @@ class Experiment:
             fig, ax = plt.subplots(
                 n_channels_to_plot,
                 1,
-                figsize=(7, 3.3 / 1.618 * n_channels_to_plot),
+                # figsize=(7, 3.3 / 1.618 * n_channels_to_plot),
                 tight_layout=True,
             )
             if n_channels_to_plot == 1:
@@ -210,12 +264,12 @@ class Experiment:
             columns = [columns]
 
         if use_exp_time:
-            if self.experiment_startime is None:
+            if self.experiment_starttime is None:
                 raise ValueError(
                     "Experiment start time is not set. Cannot use experiment time."
                 )
             x = (
-                pd.to_datetime(self.log["Timestamp"]) - self.experiment_startime
+                pd.to_datetime(self.log["Timestamp"]) - self.experiment_starttime
             ).dt.total_seconds() / 60.0
             x_label = "Experiment Time (min)"
         else:
