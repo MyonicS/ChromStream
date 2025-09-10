@@ -95,7 +95,6 @@ lint.select = [
   "ASYNC1", # flake8-async1
   "B",      # flake8-bugbear
   "C4",     # flake8-comprehensions
-  "DTZ",    # flake8-datetimez
   "E",      # pycodestyle error
   "EXE",    # flake8-executable
   "F",      # pyflakes
@@ -112,7 +111,6 @@ lint.select = [
   "PL",     # pylint
   "PT",     # flake8-pytest-style
   "PYI",    # flake8-pyi
-  "Q",      # flake8-quotes
   "RET",    # flake8-return
   "RSE",    # flake8-raise
   "RUF",    # Ruff-specific rules
