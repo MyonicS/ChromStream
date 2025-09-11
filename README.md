@@ -41,33 +41,10 @@ Here's a simple example of how to set up an experiment and add chromatograms to 
 
 ```python
 from chromstream.objects import Experiment
-from chromstream import parsers as csp
-from pathlib import Path
 
-# Create a new experiment
-experiment = Experiment("my_gc_experiment")
-
-# Path to your chromatogram data files
-data_path = Path("path/to/your/chromatogram/files")
-
-# Parse and add chromatograms from multiple files
-for file_path in data_path.glob("*.txt"):
-    # Parse chromatogram data (adjust parser based on your file format)
-    metadata, data = csp.parse_chromeleon_txt(file_path)
-    
-    # Create chromatogram object
-    chromatogram = csp.create_chromatogram_from_parsed_data(
-        data, metadata, file_path
-    )
-    
-    # Add to experiment
-    experiment.add_chromatogram(chromatogram)
-
-# Access chromatograms by channel
-channel_data = experiment.get_channel("FID")
-
-# Plot the data
-channel_data.plot()
+exp = Experiment(name='hello there')
+exp.add_chromatogram('path-to-your-chromatogram') #make a loop for this
+exp.plot_chromatograms()
 ```
 
 
