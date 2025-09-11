@@ -14,8 +14,7 @@ A Python package for processing on-line gas chromatography data. ChromStream pro
 
 ```bash
 # Clone the repository
-git clone https://github.com/Quantum-Accelerators/chromstream.git
-cd chromstream
+git clone https://git.science.uu.nl/icc-coders/ChromStream
 
 # Install in development mode
 pip install -e .
@@ -28,10 +27,10 @@ If you're using [uv](https://github.com/astral-sh/uv) for fast Python package ma
 ```bash
 
 # Or install from Git repository
-uv add git+https://github.com/Quantum-Accelerators/chromstream.git
+uv add git+https://git.science.uu.nl/icc-coders/ChromStream
 
 # For development installation
-git clone https://github.com/Quantum-Accelerators/chromstream.git
+git clone https://git.science.uu.nl/icc-coders/ChromStream
 cd chromstream
 uv add -e .
 ```
