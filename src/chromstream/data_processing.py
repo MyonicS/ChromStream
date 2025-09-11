@@ -4,7 +4,6 @@ Data processing functions for chromatogram analysis
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from scipy.integrate import trapezoid
 from typing import TYPE_CHECKING
@@ -48,7 +47,65 @@ def time_window_baseline(
     mask = (data[time_col] >= start_time) & (data[time_col] <= end_time)
     baseline_value = data.loc[mask, signal_col].mean()
 
-    return data[signal_col] - baseline_value
+    return data[signal_col] - baseline_value  # type: ignore[operator]
+
+
+def time_point_baseline(data: pd.DataFrame, time_point: float) -> pd.Series:
+    """
+    Use signal value at a specific time point as baseline
+
+    Args:
+        data: DataFrame containing time and signal columns
+        time_point: Time point to use as baseline reference. Use the same unit as the chromatogram.
+
+    Returns:
+        Corrected signal as pandas Series
+    """
+    time_col = data.columns[0]  # "Time (min)"
+    signal_col = data.columns[1]
+
+    # Find the closest data point to the specified time
+    time_diff = (data[time_col] - time_point).abs()
+    closest_index = time_diff.idxmin()
+    baseline_value = data.loc[closest_index, signal_col]
+
+    return data[signal_col] - baseline_value  # type: ignore[operator]
+
+
+def integrate_single_chromatogram(
+    chromatogram: Chromatogram, peaklist: dict, column: None | str = None
+) -> dict:
+    """
+    Integrate the signal of a single chromatogram over time.
+
+    Args:
+        chromatogram: Chromatogram object containing the data to be analyzed
+        peaklist: Dictionary defining the peaks to integrate. Example:
+        ```
+        Peaks_TCD = {"N2": [20, 26], "H2": [16, 19]}
+        ```
+        The list values must be in the same unit as the chromatogram.
+        column: Optional column name to use for integration. If None, uses second column.
+
+    Returns:
+        Dictionary with integrated peak areas and timestamp
+    """
+    data = chromatogram.data
+    time_col = data.columns[0]  # the time column must be the first!
+    # need to implement handling of pd.datetime here
+
+    signal_col = column if column is not None else data.columns[1]
+
+    injection_result = {"Timestamp": chromatogram.injection_time}
+
+    for peak_name, (start, end) in peaklist.items():
+        # Create a mask for the time window
+        mask = (data[time_col] >= start) & (data[time_col] <= end)
+
+        area = trapezoid(data.loc[mask, signal_col], data.loc[mask, time_col])
+        injection_result[peak_name] = area
+
+    return injection_result
 
 
 def integrate_channel(
@@ -64,6 +121,7 @@ def integrate_channel(
         Peaks_TCD = {"N2": [20, 26], "H2": [16, 19]}
         ```
         The list values must be in the same unit as the chromatogram.
+        column: Optional column name to use for integration. If None, uses second column.
     Returns:
         DataFrame with integrated peak areas for each injection
     """
@@ -71,24 +129,7 @@ def integrate_channel(
     results = []
 
     for chrom in chromatogram.chromatograms.values():
-        data = chrom.data
-        time_col = data.columns[0]  # the time column must be the first!
-        # need to implement handling of pd.datetime here
-
-        if column is not None:
-            signal_col = column
-        else:
-            signal_col = data.columns[1]
-
-        injection_result = {"Timestamp": chrom.injection_time}
-
-        for peak_name, (start, end) in peaklist.items():
-            # Create a mask for the time window
-            mask = (data[time_col] >= start) & (data[time_col] <= end)
-
-            area = trapezoid(data.loc[mask, signal_col], data.loc[mask, time_col])
-            injection_result[peak_name] = area
-
+        injection_result = integrate_single_chromatogram(chrom, peaklist, column)
         results.append(injection_result)
 
     return pd.DataFrame(results)

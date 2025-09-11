@@ -80,6 +80,23 @@ class Chromatogram:
 
         return self.data
 
+    def integrate_peaks(self, peaklist: dict, column: None | str = None) -> dict:
+        """
+        Integrate peaks for this chromatogram
+
+        Args:
+            peaklist: Dictionary defining the peaks to integrate. Example:
+            Peaks_TCD = {"N2": [20, 26], "H2": [16, 19]}
+            The list values must be in the same unit as the chromatogram.
+            column: Optional column name to use for integration. If None, uses second column.
+
+        Returns:
+            Dictionary with integrated peak areas and timestamp
+        """
+        from .data_processing import integrate_single_chromatogram
+
+        return integrate_single_chromatogram(self, peaklist, column=column)
+
 
 @dataclass
 class ChannelChromatograms:
@@ -135,6 +152,26 @@ class ChannelChromatograms:
             cbar.set_label("Injection Number")
 
         return ax
+
+    def apply_baseline(
+        self, correction_func, inplace=False, suffix="_BLcorr", **kwargs
+    ):
+        """
+        Apply baseline correction to all chromatograms in the channel
+
+        Args:
+            correction_func: Function that takes a pandas DataFrame and returns corrected Series
+            inplace (bool): If True, modify the original data. If False, add new column
+            suffix (str): Suffix to add to the new column name when inplace=False
+            **kwargs: Additional arguments to pass to the correction function
+
+        Returns:
+            None: Modifies chromatograms in place
+        """
+        for chrom in self.chromatograms.values():
+            chrom.apply_baseline(
+                correction_func, inplace=inplace, suffix=suffix, **kwargs
+            )
 
     def integrate_peaks(
         self, peaklist: dict, column: None | str = None

@@ -20,6 +20,7 @@ __all__ = [
     "integrate_channel",
     "min_subtract",
     "time_window_baseline",
+    "time_point_baseline",
 ]
 
 
