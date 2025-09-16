@@ -13,7 +13,7 @@ from .objects import *
 from .objects import ChannelChromatograms
 
 # Then import functions that depend on objects
-from .data_processing import integrate_channel, min_subtract, time_window_baseline
+from .data_processing import *
 
 __all__ = [
     "ChannelChromatograms",
@@ -21,6 +21,7 @@ __all__ = [
     "min_subtract",
     "time_window_baseline",
     "time_point_baseline",
+    "list_baseline_functions",
 ]
 
 

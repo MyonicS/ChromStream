@@ -252,3 +252,8 @@ def split_chromatogram(
         split_chromatograms.append(split_chromatogram)
 
     return split_chromatograms
+
+
+def list_baseline_functions():
+    baseline_functions = ["min_subtract", "time_window_baseline", "time_point_baseline"]
+    return "\n".join(baseline_functions)

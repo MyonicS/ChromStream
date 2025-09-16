@@ -153,6 +153,8 @@ class ChannelChromatograms:
 
         return ax
 
+    plot_chromatograms = plot  # alias
+
     def apply_baseline(
         self, correction_func, inplace=False, suffix="_BLcorr", **kwargs
     ):
