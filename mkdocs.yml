@@ -28,6 +28,10 @@ nav:
   - About:
       - example_docs/about/changelog.md
       - example_docs/about/license.md
+  - Examples:
+      - example_notebooks/example_calibration.ipynb
+      - example_notebooks/splitting_examples.ipynb
+      - example_notebooks/dev_notebook_MTO.ipynb
 
 repo_url: https://github.com/Quantum-Accelerators/chromstream/
 edit_uri: blob/main/docs/
@@ -95,7 +99,6 @@ plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
   - autorefs
-  - social
   - offline
   - mkdocstrings:
       default_handler: python
@@ -105,7 +108,7 @@ plugins:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
           options:
-            docstring_style: numpy
+            docstring_style: google
             docstring_section_style: list
             separate_signature: true
             merge_init_into_class: true
@@ -119,3 +122,5 @@ plugins:
         - docs/gen_ref_pages.py
   - literate-nav:
       nav_file: SUMMARY.md
+  - mkdocs-jupyter
+  - include-markdown

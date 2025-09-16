@@ -7,8 +7,8 @@ name = "chromstream"
 description="A Python package description goes here."
 version = "0.0.1"
 readme = "README.md"
-license = { text = "BSD-3" }
-authors = [{ name = "YourName", email = "YourName@email.com" }]
+license = { text = "MIT" }
+authors = [{ name = "Sebastian Rejman", email = "s.rejman@uu.nl" }]
 keywords = ["MyKeyword1", "MyKeyword2"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -32,16 +32,20 @@ dependencies = [
     "numpy",
     "pandas>=2.3.2",
     "scipy>=1.13.1",
-    "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4.0", "pytest-cov>=3.0.0", "ruff>=0.0.285"]
 docs = [
-    "mkdocs-material>=9.4.0",
-    "mkdocstrings[python]>=0.22.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-autorefs>=1.4.3", 
     "mkdocs-gen-files>=0.5.0",
-    "mkdocs-literate-nav>=0.6.0",
+    "mkdocs-include-markdown-plugin>=7.1.7",
+    "mkdocs-jupyter>=0.25.1",
+    "mkdocs-literate-nav>=0.6.2",
+    "mkdocs-material>=9.6.19",
+    "mkdocstrings>=0.30.0",
+    "mkdocstrings-python>=1.18.2",
     "pillow>=10.0.0",
     "cairosvg>=2.7.1"
 ]
@@ -173,3 +177,11 @@ disallow_untyped_calls = false
 warn_return_any = false
 
 lint.quotes = "double"
+
+[tool.uv.sources]
+chromstream = { workspace = true }
+
+[dependency-groups]
+docs = [
+    "chromstream",
+]
