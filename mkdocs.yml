@@ -4,34 +4,23 @@ site_description: >-
   This is the chromstream package!
 nav:
   - Home: index.md
-  - Overview:
-      - example_docs/intro/why.md
-      - example_docs/intro/resources.md
-  - Setup:
-      - example_docs/setup/prep.md
-      - example_docs/setup/name.md
-      - example_docs/setup/basics.md
-  - Installation:
-      - example_docs/installation/pyproject.md
-      - example_docs/installation/install.md
-  - Code:
-      - example_docs/code/source.md
-      - example_docs/code/hints.md
-      - example_docs/code/tests.md
-  - Documentation:
-      - example_docs/mkdocs/docs.md
-      - example_docs/mkdocs/build.md
-  - GitHub and CI:
-      - example_docs/github/commits.md
-      - example_docs/github/workflows.md
+  - Getting Started:
+      - getting_started/installation.md
+      - notebooks/Quickstart.ipynb
+  - Resources:
+      - Example notebooks:
+          - resources/examples.md
+          - notebooks/example_calibration.ipynb
+          - notebooks/splitting_examples.ipynb
+          - notebooks/dev_notebook_MTO.ipynb
   - Code Documentation: reference/ # keep me!
-  - About:
-      - example_docs/about/changelog.md
-      - example_docs/about/license.md
-  - Examples:
-      - example_notebooks/example_calibration.ipynb
-      - example_notebooks/splitting_examples.ipynb
-      - example_notebooks/dev_notebook_MTO.ipynb
+  - Development:
+      - development/contributing.md
+      - development/changelog.md
+  - Credits:
+      - credits/contributors.md
+      - credits/papers.md
+      - credits/citing.md
 
 repo_url: https://github.com/Quantum-Accelerators/chromstream/
 edit_uri: blob/main/docs/
