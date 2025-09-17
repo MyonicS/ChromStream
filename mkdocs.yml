@@ -22,7 +22,7 @@ nav:
       - credits/papers.md
       - credits/citing.md
 
-repo_url: https://github.com/Quantum-Accelerators/chromstream/
+repo_url: https://github.com/myonics/chromstream/
 edit_uri: blob/main/docs/
 
 theme:
@@ -45,8 +45,27 @@ theme:
     - toc.follow
   name: material
   palette:
-    primary: orange
-    scheme: slate
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: orange
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: orange
+      accent: deep-orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
   - abbr
