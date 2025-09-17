@@ -4,9 +4,10 @@ Data processing functions for chromatogram analysis
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pandas as pd
 from scipy.integrate import trapezoid
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .objects import ChannelChromatograms, Chromatogram
@@ -162,6 +163,60 @@ def get_temp_and_valves_MTO(Integral_Frame, Log):
 
     # Set timestamp as index and return
     return result.set_index("Timestamp")
+
+
+def add_log_data(
+    Integral_Frame: pd.DataFrame, Log: pd.DataFrame, columns: list[str] | all = "all"
+) -> pd.DataFrame:
+    """
+     For a dataframe that contains a timestamp column, data from a log dataframe is added.
+     The log dataframe must similarly contain a timestamp column.
+     Args:
+         Integral_Frame (pd.DataFrame): DataFrame containing e.g. chromatogram integrals.
+         Log (pd.DataFrame): DataFrame containing log data with a timestamp column.
+         columns (list[str] | 'all', optional): List of columns from the log to add. If 'all', all columns except timestamp are added. Defaults to 'all'.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the original dataframe data with log data added.
+    """
+
+    # Data validation
+    if "Timestamp" not in Integral_Frame.columns:
+        raise ValueError("Integral_Frame must contain a 'Timestamp' column.")
+    if "Timestamp" not in Log.columns:
+        raise ValueError("Log must contain a 'Timestamp' column.")
+
+    # check if the first timestamp of the log is after the first timestamp of the integral frame
+    if Log["Timestamp"].min() > Integral_Frame["Timestamp"].max():
+        raise ValueError(
+            "The first timestamp of the log is after the last timestamp of the "
+            "Integral_Frame. Check whether the right files are selected."
+        )
+
+    if Log["Timestamp"].max() < Integral_Frame["Timestamp"].min():
+        raise ValueError(
+            "The last timestamp of the log is before the first timestamp of the "
+            "Integral_Frame. Check whether the right files are selected."
+        )
+    # Ensuring dfs are sorted by timestamp
+    Integral_Frame = Integral_Frame.sort_values("Timestamp")
+    Log = Log.sort_values("Timestamp")
+
+    if columns == "all":
+        # If 'all', add all columns except timestamp
+        columns = [col for col in Log.columns if col != "Timestamp"]
+    elif not isinstance(columns, list):
+        raise ValueError("columns must be a list of column names or 'all'.")
+
+    # Merging the dataframes
+    merged = pd.merge_asof(
+        Integral_Frame,
+        Log[["Timestamp"] + columns],
+        on="Timestamp",
+        direction="nearest",
+    )
+
+    return merged
 
 
 # To do - seperate integrate chrom function

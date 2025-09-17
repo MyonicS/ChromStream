@@ -84,6 +84,7 @@ exclude = '''
 )/
 '''
 skip-magic-trailing-comma = true
+line-length = 88
 
 [tool.isort]
 profile = 'black'
@@ -136,7 +137,7 @@ lint.select = [
   "YTT",    # flake8-2020
 ]
 lint.ignore = [
-  "E501",   # Line too long
+  # "E501",   # Line too long (enable length checking via ruff/black below)
   "ISC001",   # single-line-implicit-string-concatenation
   "PLR",    # Design related pylint codes
   "PERF203",  # try-except-in-loop
@@ -154,6 +155,7 @@ lint.isort.required-imports = ["from __future__ import annotations"]
 lint.isort.split-on-trailing-comma=false
 src = ["src"]
 extend-include = ["*.ipynb"]
+line-length = 88
 
 [tool.ruff.format]
 docstring-code-format = true

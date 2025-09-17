@@ -34,13 +34,13 @@ uv add git+https://github.com/MyonicS/ChromStream
 ## Quick Start
 
 Check the Quickstart Notebook to see a full demonstration of the most important features of the package. 
-Here's a simple example of how to set up an experiment and add chromatograms to it:
+Here's a simple example of how to set up an experiment, add chromatograms and plot them:
 
 ```python
-from chromstream.objects import Experiment
+import chromstream as cs
 
-exp = Experiment(name='hello there')
-exp.add_chromatogram('path-to-your-chromatogram') #make a loop for this
+exp = cs.Experiment(name='hello there')
+exp.add_chromatogram('path-to-your-chromatogram') #loop over files to add multiple
 exp.plot_chromatograms()
 ```
 
@@ -61,11 +61,11 @@ ChromStream currently supports parsing data from:
 
 - Chromeleon software exports (`.txt`)
 - (software names) (ascii files)
-- Certain labview log files 
+- simple log files (e.g. exported from labview)
 
 ## Documentation
 
-- to be developed and hosted
+- You can find the full documentation of the package [here](https://myonics.github.io/ChromStream/).
 
 ## Example Notebooks
 
@@ -87,5 +87,6 @@ PRs are more than welcome.
 
 ## Authors
 
+Sebastian Rejman - Utrecht University
 
 
