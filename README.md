@@ -1,5 +1,9 @@
 # ChromStream
 
+<p align="center">
+  <img src="docs/assets/chromstream_logo.svg" alt="pyGCxGC Logo" width="200"/>
+</p>
+
 A Python package for processing on-line gas chromatography data. ChromStream provides tools to parse, analyze, and visualize chromatographic data from various GC systems, and combine it with data from logfiles such as temperature and pressure.
 
 ## Features
@@ -17,11 +21,7 @@ Chromstream is presently not availible on PyPi. You can however install it strai
 ### Install from Git Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/MyonicS/ChromStream
-cd ChromStream
-# Install in development mode
-pip install -e .
+pip install git+https://github.com/MyonicS/ChromStream
 ```
 
 ### Install using uv

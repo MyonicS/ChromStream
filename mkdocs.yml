@@ -43,6 +43,7 @@ theme:
     - header.autohide
     - toc.follow
   name: material
+  logo: assets/chromstream_logo.svg
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
