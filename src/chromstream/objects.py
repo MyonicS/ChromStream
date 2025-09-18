@@ -176,7 +176,7 @@ class ChannelChromatograms:
             )
 
     def integrate_peaks(
-        self, peaklist: dict, column: None | str = None
+        self, peaklist: dict, column: None | str = None, per_peak_baseline: bool = False
     ) -> pd.DataFrame:
         """
         Integrate peaks for all chromatograms in the channel
@@ -192,7 +192,7 @@ class ChannelChromatograms:
         Returns:
             DataFrame with integrated peak areas for each injection
         """
-        self.integrals = integrate_channel(self, peaklist, column=column)
+        self.integrals = integrate_channel(self, peaklist, column=column, per_peak_baseline=per_peak_baseline)
         return self.integrals
 
 

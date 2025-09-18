@@ -75,7 +75,7 @@ def time_point_baseline(data: pd.DataFrame, time_point: float) -> pd.Series:
 
 
 def integrate_single_chromatogram(
-    chromatogram: Chromatogram, peaklist: dict, column: None | str = None
+    chromatogram: Chromatogram, peaklist: dict, column: None | str = None, per_peak_baseline: bool = False
 ) -> dict:
     """
     Integrate the signal of a single chromatogram over time.
@@ -105,15 +105,17 @@ def integrate_single_chromatogram(
         mask = (data[time_col] >= start) & (data[time_col] <= end)
 
         ## Start Jan's peak baseline correction ##
-        peak_signal_start = data[mask][signal_col].values[0]
-        peak_signal_end = data[mask][signal_col].values[-1]
 
-        baseline_signal = np.linspace(peak_signal_start, peak_signal_end, len(data[mask]))
-        data_bsl = data.loc[mask, signal_col] - baseline_signal
+        if per_peak_baseline is True:
+            peak_signal_start = data[mask][signal_col].values[0]
+            peak_signal_end = data[mask][signal_col].values[-1]
 
-        area_bsl = trapezoid(data_bsl, data.loc[mask, time_col])
+            baseline_signal = np.linspace(peak_signal_start, peak_signal_end, len(data[mask]))
+            data_bsl = data.loc[mask, signal_col] - baseline_signal
 
-        injection_result[peak_name + '_bsl'] = area_bsl
+            area_bsl = trapezoid(data_bsl, data.loc[mask, time_col])
+
+            injection_result[peak_name + '_bsl'] = area_bsl
         ## End Jan's peak baseline correction ##
 
         area = trapezoid(data.loc[mask, signal_col], data.loc[mask, time_col])
@@ -123,7 +125,7 @@ def integrate_single_chromatogram(
 
 
 def integrate_channel(
-    chromatogram: ChannelChromatograms, peaklist: dict, column: None | str = None
+    chromatogram: ChannelChromatograms, peaklist: dict, column: None | str = None, per_peak_baseline: bool = False
 ) -> pd.DataFrame:
     """
     Integrate the signal of a chromatogram over time.
@@ -143,7 +145,7 @@ def integrate_channel(
     results = []
 
     for chrom in chromatogram.chromatograms.values():
-        injection_result = integrate_single_chromatogram(chrom, peaklist, column)
+        injection_result = integrate_single_chromatogram(chrom, peaklist, column, per_peak_baseline=per_peak_baseline)
         results.append(injection_result)
 
     return pd.DataFrame(results)
