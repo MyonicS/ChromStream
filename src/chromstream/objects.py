@@ -139,8 +139,15 @@ class ChannelChromatograms:
                 **kwargs,
             )
 
-        ax.set_xlabel(chrom.data.columns[0])  # type: ignore
-        ax.set_ylabel(chrom.data.columns[1])  # type: ignore
+        # Set labels and title (handle empty channel case)
+        if len(self.chromatograms) > 0:
+            # Use any chromatogram to get column names
+            sample_chrom = next(iter(self.chromatograms.values()))
+            ax.set_xlabel(sample_chrom.data.columns[0])
+            ax.set_ylabel(sample_chrom.data.columns[1])
+        else:
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Signal")
         ax.set_title(f"Channel: {self.channel}")
         # add colorbar
         if plot_colorbar:
@@ -251,6 +258,20 @@ class Experiment:
             n_channels_to_plot = (
                 len(self.channels) if channels == "all" else len(channels)
             )
+
+            # Handle empty experiment case
+            if n_channels_to_plot == 0:
+                fig, ax = plt.subplots()
+                ax.text(
+                    0.5,
+                    0.5,
+                    "No channels to plot",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                )
+                ax.set_title("Empty Experiment")
+                return
 
             fig, ax = plt.subplots(
                 n_channels_to_plot,
