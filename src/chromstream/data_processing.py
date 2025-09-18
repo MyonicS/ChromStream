@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 from scipy.integrate import trapezoid
 
@@ -102,6 +103,18 @@ def integrate_single_chromatogram(
     for peak_name, (start, end) in peaklist.items():
         # Create a mask for the time window
         mask = (data[time_col] >= start) & (data[time_col] <= end)
+
+        ## Start Jan's peak baseline correction ##
+        peak_signal_start = data[mask][signal_col].values[0]
+        peak_signal_end = data[mask][signal_col].values[-1]
+
+        baseline_signal = np.linspace(peak_signal_start, peak_signal_end, len(data[mask]))
+        data_bsl = data.loc[mask, signal_col] - baseline_signal
+
+        area_bsl = trapezoid(data_bsl, data.loc[mask, time_col])
+
+        injection_result[peak_name + '_bsl'] = area_bsl
+        ## End Jan's peak baseline correction ##
 
         area = trapezoid(data.loc[mask, signal_col], data.loc[mask, time_col])
         injection_result[peak_name] = area
