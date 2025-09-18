@@ -1,6 +1,6 @@
 # Citing ChromStream
 
-If you use ChromStream in your research, please cite it to help support the project and make it easier for others to find.
+If you use ChromStream in your research, please consider citing it to help support the project and make it easier for others to find.
 
 ## Software Citation
 

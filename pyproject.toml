@@ -137,7 +137,7 @@ lint.select = [
   "YTT",    # flake8-2020
 ]
 lint.ignore = [
-  # "E501",   # Line too long (enable length checking via ruff/black below)
+  "E501",   # Line too long (enable length checking via ruff/black below)
   "ISC001",   # single-line-implicit-string-concatenation
   "PLR",    # Design related pylint codes
   "PERF203",  # try-except-in-loop

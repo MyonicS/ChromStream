@@ -11,8 +11,7 @@ nav:
       - Example notebooks:
           - resources/examples.md
           - notebooks/example_calibration.ipynb
-          - notebooks/splitting_examples.ipynb
-          - notebooks/dev_notebook_MTO.ipynb
+          - notebooks/cracking_example.ipynb
   - Code Documentation: reference/ # keep me!
   - Development:
       - development/contributing.md
@@ -66,6 +65,10 @@ theme:
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax-config.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 markdown_extensions:
   - abbr
