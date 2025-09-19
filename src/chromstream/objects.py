@@ -192,7 +192,7 @@ class ChannelChromatograms:
         Returns:
             DataFrame with integrated peak areas for each injection
         """
-        self.integrals = integrate_channel(self, peaklist, column=column, per_peak_baseline=per_peak_baseline)
+        self.integrals = integrate_channel(self, peaklist, column=column)
         return self.integrals
 
 
