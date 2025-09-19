@@ -183,7 +183,7 @@ class ChannelChromatograms:
             )
 
     def integrate_peaks(
-        self, peaklist: dict, column: None | str = None
+        self, peaklist: dict, column: None | str = None, per_peak_baseline: bool = False
     ) -> pd.DataFrame:
         """
         Integrate peaks for all chromatograms in the channel
