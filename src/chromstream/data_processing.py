@@ -74,50 +74,49 @@ def time_point_baseline(data: pd.DataFrame, time_point: float) -> pd.Series:
     return data[signal_col] - baseline_value  # type: ignore[operator]
 
 
-def two_point_baseline(data: pd.DataFrame, peaks: dict) -> pd.Series:
+def two_point_baseline(data: pd.DataFrame) -> pd.Series:
     """
-    Subtract a linear baseline between two specified time points for each peak.
+    Use linear baseline defined by two time points.
 
     Args:
-        data: DataFrame with time and signal columns
-        peaks: Dict of peak names to [start, end] time points
+        data: DataFrame containing time and signal columns
+        time_points: Tuple specifying the start and end time of the baseline points. Use the same unit as the chromatogram.
 
     Returns:
         Corrected signal as pandas Series
     """
-    time_col, signal_col = data.columns[0], data.columns[1]
-    corrected_segments = []
+    time_col = data.columns[0]  # "Time (min)"
+    signal_col = data.columns[1]
 
-    for time_points in peaks.values():
-        if len(time_points) != 2:
-            raise ValueError("Each entry in peaks must contain exactly two values.")
-        start, end = time_points
-        start_time, end_time = time_points
-        time_col = data.columns[0]  # "Time (min)"
-        signal_col = data.columns[1]
+    # Create linear baseline based on first and last point
+    baseline = np.linspace(data[signal_col].iloc[0], data[signal_col].iloc[-1], len(data))
 
-        # Find the closest data point to the specified time for both points
-        start_time_diff, end_time_diff = (data[time_col] - start_time).abs(), (data[time_col] - end_time).abs()
-        closest_index_start, closest_index_end = int(start_time_diff.idxmin()), int(end_time_diff.idxmin())
+    return data[signal_col] - baseline  # type: ignore[operator]
 
-        baseline_start = data.loc[[closest_index_start], signal_col].astype(float).values[0]
-        baseline_end = data.loc[[closest_index_end], signal_col].astype(float).values[0]
 
-        # Create a linear baseline between the two points
-        baseline = np.linspace(baseline_start, baseline_end, num=closest_index_end - closest_index_start + 1)
-        corrected_signal = data[signal_col].iloc[closest_index_start:closest_index_end + 1] - baseline
-        corrected_segments.append(corrected_signal)
+def integrate_single_peak(
+    data: pd.DataFrame, boundaries: tuple[float, float], baseline = None, **kwargs) -> float:
+    """
+    Integrate the signal of a single chromatogram over time.
 
-    # Concatenate all segments and sort by index
-    corrected_data = pd.concat(corrected_segments).sort_index()
+    Args:
+        data: DataFrame containing the chromatogram data
+        peak: Tuple defining the peak to integrate. Example: (20, 26)
+              The list values must be in the same unit as the chromatogram.
 
-    # Fill missing indexes with original (uncorrected) values.
-    missing_indexes = data.index.difference(corrected_data.index)
-    uncorrected = data.loc[missing_indexes, data.columns[1]]
-    corrected_data = pd.concat([corrected_data, uncorrected]).sort_index()
+    Returns:
+    """
+    start_point, end_point = boundaries
+    time_col = data.columns[0]  # "Time (min)"
+    signal_col = data.columns[1]
 
-    # Return data between time_points with the baseline subtracted
-    return corrected_data if isinstance(corrected_data, pd.Series) else corrected_data[data.columns[1]]
+    if baseline is not None:
+        data[signal_col] = baseline(data, **kwargs)
+
+    # Select datapoints in the specified peak window
+    mask = (data[time_col] >= start_point) & (data[time_col] <= end_point)
+    area = trapezoid(data.loc[mask, signal_col], data.loc[mask, time_col])
+    return area
 
 
 def integrate_single_chromatogram(
