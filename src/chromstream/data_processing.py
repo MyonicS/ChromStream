@@ -80,7 +80,6 @@ def two_point_baseline(data: pd.DataFrame) -> pd.Series:
 
     Args:
         data: DataFrame containing time and signal columns
-        time_points: Tuple specifying the start and end time of the baseline points. Use the same unit as the chromatogram.
 
     Returns:
         Corrected signal as pandas Series
@@ -97,14 +96,16 @@ def two_point_baseline(data: pd.DataFrame) -> pd.Series:
 def integrate_single_peak(
     data: pd.DataFrame, boundaries: tuple[float, float], baseline = None, **kwargs) -> float:
     """
-    Integrate the signal of a single chromatogram over time.
+    Integrate a single peak in a chromatogram DataFrame.
 
     Args:
-        data: DataFrame containing the chromatogram data
-        peak: Tuple defining the peak to integrate. Example: (20, 26)
-              The list values must be in the same unit as the chromatogram.
+        data: DataFrame containing time and signal columns
+        boundaries: Tuple specifying the start and end time of the peak to integrate. Use the same unit as the chromatogram.
+        baseline: Optional baseline function to apply to the peak before integration. If None, no baseline correction is applied
+        **kwargs: Additional keyword arguments to pass to the baseline function
 
     Returns:
+        Integrated peak area as float
     """
     start_point, end_point = boundaries
     time_col = data.columns[0]  # "Time (min)"
