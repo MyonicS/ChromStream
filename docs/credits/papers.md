@@ -4,4 +4,4 @@ This page lists scientific publications that have used ChromStream for data anal
 
 ## Published Papers
 
-*No papers have been submitted yet. Be the first to publish using ChromStream!*
+*If you have used ChromStream in your research, feel free to let us know so we can add it to the list*
