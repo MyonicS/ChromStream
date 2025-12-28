@@ -283,11 +283,8 @@ name = "chromstream"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "ipykernel" },
-    { name = "ipympl" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "mkdocs-include-markdown-plugin" },
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "numpy", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -305,6 +302,8 @@ dev = [
 ]
 docs = [
     { name = "cairosvg" },
+    { name = "ipykernel" },
+    { name = "ipympl" },
     { name = "mkdocs" },
     { name = "mkdocs-autorefs" },
     { name = "mkdocs-gen-files" },
@@ -325,13 +324,12 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "cairosvg", marker = "extra == 'docs'", specifier = ">=2.7.1" },
-    { name = "ipykernel", specifier = ">=6.30.1" },
-    { name = "ipympl", specifier = ">=0.9.7" },
+    { name = "ipykernel", marker = "extra == 'docs'", specifier = ">=6.30.1" },
+    { name = "ipympl", marker = "extra == 'docs'", specifier = ">=0.9.7" },
     { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.1" },
     { name = "mkdocs-autorefs", marker = "extra == 'docs'", specifier = ">=1.4.3" },
     { name = "mkdocs-gen-files", marker = "extra == 'docs'", specifier = ">=0.5.0" },
-    { name = "mkdocs-include-markdown-plugin", specifier = ">=7.1.7" },
     { name = "mkdocs-include-markdown-plugin", marker = "extra == 'docs'", specifier = ">=7.1.7" },
     { name = "mkdocs-jupyter", marker = "extra == 'docs'", specifier = ">=0.25.1" },
     { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6.2" },
@@ -339,7 +337,7 @@ requires-dist = [
     { name = "mkdocstrings", marker = "extra == 'docs'", specifier = ">=0.30.0" },
     { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = ">=1.18.2" },
     { name = "numpy" },
-    { name = "pandas", specifier = ">=2.3.2" },
+    { name = "pandas", specifier = ">=2.2.2" },
     { name = "pillow", marker = "extra == 'docs'", specifier = ">=10.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=3.0.0" },
