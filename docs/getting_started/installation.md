@@ -2,19 +2,10 @@
 
 ChromStream is a Python package for processing on-line gas chromatography data. Follow the instructions below to install the package.
 
-## Requirements
-
-- Python 3.8 or higher
-- Git (for installing from repository)
-
-## Direct Installation from Repository
-
-ChromStream is presently not available on PyPI. You can install it directly from the GitHub repository without cloning:
-
 ### Using pip
 
 ```bash
-pip install git+https://github.com/MyonicS/ChromStream
+pip install ChromStream
 ```
 
 ### Using uv
@@ -22,7 +13,7 @@ pip install git+https://github.com/MyonicS/ChromStream
 If you're using [uv](https://github.com/astral-sh/uv) for fast Python package management:
 
 ```bash
-uv add git+https://github.com/MyonicS/ChromStream
+uv add ChromStream
 ```
 
 ## Development Installation

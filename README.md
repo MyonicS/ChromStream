@@ -16,12 +16,11 @@ A Python package for processing on-line gas chromatography data. ChromStream pro
 - Addition of logfiles
 
 ## Installation
-Chromstream is presently not availible on PyPi. You can however install it straight from the repository:
 
-### Install from Git Repository
+### Installing using pip
 
 ```bash
-pip install git+https://github.com/MyonicS/ChromStream
+pip install ChromStream
 ```
 
 ### Install using uv
@@ -29,7 +28,7 @@ pip install git+https://github.com/MyonicS/ChromStream
 If you're using [uv](https://github.com/astral-sh/uv) for fast Python package management:
 
 ```bash
-uv add git+https://github.com/MyonicS/ChromStream
+uv add ChromStream
 ```
 ## Quick Start
 
