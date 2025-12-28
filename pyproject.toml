@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chromstream"
-description="A Python package description goes here."
+description="A Python package for online gas chromatography."
 version = "0.0.1"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Sebastian Rejman", email = "s.rejman@uu.nl" }]
-keywords = ["MyKeyword1", "MyKeyword2"]
+keywords = ["GC"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
