@@ -235,9 +235,15 @@ class Experiment:
 
         """
         if isinstance(chromatogram, (str, Path)):
-            from .parsers import parse_chromatogram_txt
+            path = Path(chromatogram)
+            if path.suffix.lower() == ".ch":
+                from .parsers import parse_agilent_ch
 
-            chrom = parse_chromatogram_txt(chromatogram)
+                chrom = parse_agilent_ch(chromatogram)
+            else:
+                from .parsers import parse_chromatogram_txt
+
+                chrom = parse_chromatogram_txt(chromatogram)
         elif isinstance(chromatogram, Chromatogram):
             chrom = chromatogram
         else:
