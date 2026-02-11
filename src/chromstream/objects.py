@@ -243,7 +243,10 @@ class Experiment:
             else:
                 from .parsers import parse_chromatogram_txt
 
-                chrom = parse_chromatogram_txt(chromatogram)
+                try:
+                    chrom = parse_chromatogram_txt(chromatogram)
+                except Exception as e:
+                    raise ValueError(f"Failed to parse chromatogram: {e}")
         elif isinstance(chromatogram, Chromatogram):
             chrom = chromatogram
         else:
@@ -258,6 +261,41 @@ class Experiment:
 
         injection_num = len(self.channels[channel].chromatograms)
         self.channels[channel].add_chromatogram(injection_num, chrom)
+
+    def add_mult_chromatograms(
+        self,
+        chromatograms: list[Path | str | Chromatogram] | Path | str,
+        channel_name: str | None = None,
+    ):
+        """Add multiple chromatograms to the experiment
+
+        Args:
+            chromatograms: Either:
+                - A list of Chromatogram objects
+                - A list of paths to chromatogram files
+                - A path to a .d directory containing .ch files
+            channel_name: Optional channel name to override for all chromatograms
+        """
+        # Convert single path to Path object if needed
+        if isinstance(chromatograms, (str, Path)):
+            path = Path(chromatograms)
+            # Check if it's a .d directory
+            if path.is_dir() and path.name.lower().endswith(".d"):
+                from .parsers.agilent import chromlist_from_dot_d
+
+                chrom_list = chromlist_from_dot_d(path)
+                for chrom in chrom_list:
+                    self.add_chromatogram(chrom, channel_name=channel_name)
+            else:
+                raise ValueError(f"Path must be a .d directory. Got: {chromatograms}")
+        elif isinstance(chromatograms, list):
+            # Handle list of chromatograms or paths
+            for chrom in chromatograms:
+                self.add_chromatogram(chrom, channel_name=channel_name)
+        else:
+            raise ValueError(
+                "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory"
+            )
 
     def plot_chromatograms(self, ax=None, channels: str | list = "all", **kwargs):
         if ax is None:

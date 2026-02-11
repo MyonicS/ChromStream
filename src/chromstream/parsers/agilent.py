@@ -1,5 +1,5 @@
 """
-Adapted from Matlab code found at:
+Agilent binary parser adapted from Matlab code found at:
 https://github.com/chemplexity/chromatography/blob/master/Methods/Import/ImportAgilent.m
 """
 
@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from chromstream.objects import Chromatogram
+import os
+import logging as log
 
 
 def read_pascal_string(f, encoding="latin-1"):
@@ -147,10 +149,14 @@ def parse_date(date_str):
     return pd.to_datetime(date_str, errors="coerce")
 
 
-def parse_agilent_ch(file_path):
+def parse_agilent_ch(file_path) -> Chromatogram:
     """
     Parses Agilent .ch files to a Chromatogram object.
     Supports versions 8, 81, 179, 181.
+    Args:
+        file_path (str | Path): Path to the .ch file.
+    Returns:
+        Chromatogram: Parsed chromatogram object.
     """
     path = Path(file_path)
     if not path.exists():
@@ -303,3 +309,31 @@ def parse_agilent_ch(file_path):
         channel=channel,
         path=str(path),
     )
+
+
+def chromlist_from_dot_d(path_dir: Path) -> list[Chromatogram]:
+    """
+    Given a path to a Chromeleon .d directory, parses all chromatogram files
+    and returns a list of Chromatogram objects.
+
+    Args:
+    path_dir : Path
+        Path to the .d directory.
+
+    Returns:
+    List[Chromatogram]
+        List of parsed Chromatogram objects.
+    """
+    # if the dir doesn't end with .d or is nto a directory, raise an error
+    if not path_dir.is_dir() or not path_dir.name.lower().endswith(".d"):
+        raise ValueError(f"Provided path is not a valid .d directory: {path_dir}")
+
+    chrom_list = []
+    for file in os.listdir(path_dir):
+        if file.endswith(".ch"):
+            chrom_path = path_dir / file
+            chrom = parse_agilent_ch(chrom_path)
+            chrom_list.append(chrom)
+    if len(chrom_list) == 0:
+        log.warning(f"No .ch files found in directory: {path_dir}")
+    return chrom_list
