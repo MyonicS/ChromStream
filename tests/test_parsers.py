@@ -7,6 +7,7 @@ from chromstream.parsers import (
     parse_MTO_asc,
     parse_log_file,
     parse_log_MTO,
+    parse_agilent_dx,
 )
 
 # Test data directories
@@ -164,3 +165,25 @@ class TestLogParsers:
         assert isinstance(log_df, pd.DataFrame)
         assert not log_df.empty
         assert "Timestamp" in log_df.columns
+
+
+class TestAgilentParsers:
+    """Test Agilent file parsing functions"""
+
+    def test_parse_dx_file(self):
+        """Test parsing .dx file"""
+        file_path = TEST_DATA_DIR / "test_dx.dx"
+        chrom_list = parse_agilent_dx(file_path)
+
+        # Verify we get a list of chromatograms
+        assert chrom_list is not None
+        assert isinstance(chrom_list, list)
+        assert len(chrom_list) > 0
+
+        # Verify each chromatogram has required attributes
+        for chrom in chrom_list:
+            assert chrom.data is not None
+            assert isinstance(chrom.data, pd.DataFrame)
+            assert not chrom.data.empty
+            assert chrom.injection_time is not None
+            assert chrom.channel is not None
