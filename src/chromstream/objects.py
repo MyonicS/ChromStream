@@ -143,8 +143,16 @@ class ChannelChromatograms:
         if len(self.chromatograms) > 0:
             # Use any chromatogram to get column names
             sample_chrom = next(iter(self.chromatograms.values()))
-            ax.set_xlabel(sample_chrom.data.columns[0])
-            ax.set_ylabel(sample_chrom.data.columns[1])
+            ax.set_xlabel(
+                "Time (" + sample_chrom.metadata["time_unit"] + ")"
+                if "time_unit" in sample_chrom.metadata
+                else "Time"
+            )
+            ax.set_ylabel(
+                "Signal (" + sample_chrom.metadata["Signal Unit"] + ")"
+                if "Signal Unit" in sample_chrom.metadata
+                else "Signal"
+            )
         else:
             ax.set_xlabel("Time")
             ax.set_ylabel("Signal")
