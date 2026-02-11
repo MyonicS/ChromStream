@@ -10,6 +10,8 @@ from pathlib import Path
 from chromstream.objects import Chromatogram
 import os
 import logging as log
+import zipfile
+import xml.etree.ElementTree as ET
 
 
 def read_pascal_string(f, encoding="latin-1"):
@@ -120,9 +122,11 @@ def double_array(f, offset):
         return np.array([])
 
     f.seek(offset)
-    # Using numpy for fast reading of doubles
-    # Matlab uses little endian for DoubleArray ('double', 'l')
-    data = np.fromfile(f, dtype="<d")
+    # Read bytes and convert to numpy array
+    # Works with both real files and file-like objects from zipfile
+    bytes_to_read = count * 8
+    data_bytes = f.read(bytes_to_read)
+    data = np.frombuffer(data_bytes, dtype="<d")
     return data.astype(float)
 
 
@@ -149,22 +153,60 @@ def parse_date(date_str):
     return pd.to_datetime(date_str, errors="coerce")
 
 
-def parse_agilent_ch(file_path) -> Chromatogram:
+def _prepare_file_input(file_path, file_name=None, channel_name=None):
+    """
+    Prepare file input for parsing, handling both file paths and file-like objects.
+    File-like objects are required for direct reading of .dx files, which are zip archives.
+
+    Args:
+        file_path: Path to file or file-like object
+        file_name: Optional filename for file-like objects
+        channel_name: Optional channel name override
+
+    Returns:
+        Tuple of (file_object, channel, path_str, should_close)
+    """
+    if hasattr(file_path, "read"):
+        # It's a file-like object
+        f = file_path
+        should_close = False
+        channel = (
+            channel_name
+            if channel_name
+            else (Path(file_name).stem if file_name else "unknown")
+        )
+        path_str = file_name if file_name else "unknown.ch"
+    else:
+        # It's a path
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+        f = open(path, "rb")
+        should_close = True
+        channel = channel_name if channel_name else path.stem
+        path_str = str(path)
+
+    return f, channel, path_str, should_close
+
+
+def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogram:
     """
     Parses Agilent .ch files to a Chromatogram object.
     Supports versions 8, 81, 179, 181.
     Args:
-        file_path (str | Path): Path to the .ch file.
+        file_path (str | Path | file-like): Path to the .ch file or file-like object from zipfile.
+        file_name (str, optional): Name of the file when file_path is a file-like object.
+        channel_name (str, optional): Override channel name (otherwise extracted from filename).
     Returns:
         Chromatogram: Parsed chromatogram object.
     """
-    path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
+    f, channel, path_str, should_close = _prepare_file_input(
+        file_path, file_name, channel_name
+    )
 
     metadata = {}
 
-    with open(path, "rb") as f:
+    try:
         # Read version string
         version = read_pascal_string(f, "latin-1")
         metadata["version"] = version
@@ -281,6 +323,10 @@ def parse_agilent_ch(file_path) -> Chromatogram:
         else:
             raise ValueError(f"Unsupported Agilent version: {version}")
 
+    finally:
+        if should_close:
+            f.close()
+
     # Create Time Array
     if len(tic) > 1:
         time = np.linspace(xmin, xmax, len(tic))
@@ -293,10 +339,7 @@ def parse_agilent_ch(file_path) -> Chromatogram:
     # Parse Date
     injection_time = parse_date(metadata.get("date"))
     if pd.isna(injection_time):
-        raise ValueError(f"Invalid injection time parsed from {path}")
-
-    # Determine Channel from filename
-    channel = path.stem
+        raise ValueError(f"Invalid injection time parsed from {path_str}")
 
     # Ensure time_unit
     if "time_unit" not in metadata:
@@ -307,7 +350,7 @@ def parse_agilent_ch(file_path) -> Chromatogram:
         injection_time=injection_time,
         metadata=metadata,
         channel=channel,
-        path=str(path),
+        path=path_str,
     )
 
 
@@ -337,3 +380,73 @@ def chromlist_from_dot_d(path_dir: Path) -> list[Chromatogram]:
     if len(chrom_list) == 0:
         log.warning(f"No .ch files found in directory: {path_dir}")
     return chrom_list
+
+
+def _parse_acmd_channel_mapping(dx_open: zipfile.ZipFile) -> dict[str, str]:
+    """
+    Parse .acmd XML file from a .dx archive to extract TraceId -> ChannelName mapping.
+
+    Args:
+        dx_open: Open ZipFile object
+
+    Returns:
+        Dictionary mapping TraceId to ChannelName
+    """
+    channel_map = {}
+    for file in dx_open.namelist():
+        if file.lower().endswith(".acmd"):
+            try:
+                with dx_open.open(file) as acmd_file:
+                    tree = ET.parse(acmd_file)
+                    root = tree.getroot()
+                    # Define namespace
+                    ns = {"acmd": "urn:schemas-agilent-com:acmd20"}
+                    # Extract signal information
+                    for signal in root.findall(".//acmd:Signal", ns):
+                        trace_id = signal.find("acmd:TraceId", ns)
+                        channel_name = signal.find("acmd:ChannelName", ns)
+                        if trace_id is not None and channel_name is not None:
+                            channel_map[trace_id.text] = channel_name.text
+            except Exception as e:
+                log.warning(f"Failed to parse .acmd file: {e}")
+            break
+    return channel_map
+
+
+def parse_agilent_dx(file_path) -> list[Chromatogram]:
+    """
+    Parses Agilent .dx files to a list of Chromatogram objects.
+    #todo: add additonal docs
+
+    Args:
+        file_path (str | Path): Path to the .dx file.
+    Returns:
+        List[Chromatogram]: List of parsed chromatogram objects.
+    """
+    # check if file is a .dx file
+    path = Path(file_path)
+    if not path.exists() or not path.is_file() or not path.suffix.lower() == ".dx":
+        raise ValueError(f"Provided path is not a valid .dx file: {file_path}")
+
+    # trying to unzip
+    with zipfile.ZipFile(path, "r") as dx_open:
+        # Parse .acmd file to get channel names
+        channel_map = _parse_acmd_channel_mapping(dx_open)
+
+        chrom_list = []
+        for file in dx_open.namelist():
+            if file.lower().endswith(".ch"):
+                with dx_open.open(file) as f:
+                    # Try to match filename to channel name
+                    # .ch files are typically named with TraceId
+                    file_stem = Path(file).stem
+                    channel_name = channel_map.get(file_stem) if channel_map else None
+
+                    chrom = parse_agilent_ch(
+                        f, file_name=file, channel_name=channel_name
+                    )
+                    chrom_list.append(chrom)
+
+        if len(chrom_list) == 0:
+            log.warning(f"No .ch files found in .dx archive: {file_path}")
+        return chrom_list
