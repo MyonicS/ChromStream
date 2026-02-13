@@ -14,7 +14,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 
-def read_pascal_string(f, encoding="latin-1"):
+def _read_pascal_string(f, encoding="latin-1"):
     """Read a pascal string (length byte + chars)"""
     length_byte = f.read(1)
     if not length_byte:
@@ -34,7 +34,7 @@ def read_pascal_string(f, encoding="latin-1"):
         return string_data.decode("latin-1", errors="replace").strip()
 
 
-def delta_compression(f, offset):
+def _delta_compression(f, offset):
     """
     Decodes Delta Compressed signal (Version 8)
     """
@@ -74,7 +74,7 @@ def delta_compression(f, offset):
     return np.array(signals, dtype=float)
 
 
-def double_delta_compression(f, offset):
+def _double_delta_compression(f, offset):
     """
     Decodes Double Delta Compressed signal (Version 81, 181)
     """
@@ -110,7 +110,7 @@ def double_delta_compression(f, offset):
     return np.array(signals, dtype=float)
 
 
-def double_array(f, offset):
+def _double_array(f, offset):
     """
     Decodes Double Array signal (Version 179)
     """
@@ -130,7 +130,7 @@ def double_array(f, offset):
     return data.astype(float)
 
 
-def parse_date(date_str):
+def _parse_date(date_str):
     if not date_str:
         return pd.NaT
     formats = [
@@ -208,7 +208,7 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
 
     try:
         # Read version string
-        version = read_pascal_string(f, "latin-1")
+        version = _read_pascal_string(f, "latin-1")
         metadata["version"] = version
 
         tic = np.array([])
@@ -234,9 +234,9 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
 
             for key, off in offsets.items():
                 f.seek(off)
-                metadata[key] = read_pascal_string(f, encoding)
+                metadata[key] = _read_pascal_string(f, encoding)
 
-            tic = delta_compression(f, sig_offset)
+            tic = _delta_compression(f, sig_offset)
 
             f.seek(282)
             xmin = struct.unpack(">i", f.read(4))[0] / 60000.0
@@ -271,9 +271,9 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
 
             for key, off in offsets.items():
                 f.seek(off)
-                metadata[key] = read_pascal_string(f, encoding)
+                metadata[key] = _read_pascal_string(f, encoding)
 
-            tic = double_delta_compression(f, sig_offset)
+            tic = _double_delta_compression(f, sig_offset)
 
             f.seek(282)
             xmin = struct.unpack(">f", f.read(4))[0] / 60000.0
@@ -303,7 +303,7 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
 
             for key, off in offsets.items():
                 f.seek(off)
-                metadata[key] = read_pascal_string(f, encoding)
+                metadata[key] = _read_pascal_string(f, encoding)
 
             f.seek(282)
             xmin = struct.unpack(">f", f.read(4))[0] / 60000.0
@@ -314,9 +314,9 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
             slope = struct.unpack(">d", f.read(8))[0]
 
             if version == "179":
-                tic = double_array(f, sig_offset)
+                tic = _double_array(f, sig_offset)
             else:
-                tic = double_delta_compression(f, sig_offset)
+                tic = _double_delta_compression(f, sig_offset)
 
             tic = tic * slope + intercept
 
@@ -337,7 +337,7 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
     df = pd.DataFrame({"Time": time, "Signal": tic})
 
     # Parse Date
-    injection_time = parse_date(metadata.get("date"))
+    injection_time = _parse_date(metadata.get("date"))
     if pd.isna(injection_time):
         raise ValueError(f"Invalid injection time parsed from {path_str}")
 
@@ -360,12 +360,10 @@ def chromlist_from_dot_d(path_dir: Path) -> list[Chromatogram]:
     and returns a list of Chromatogram objects.
 
     Args:
-    path_dir : Path
-        Path to the .d directory.
+        path_dir (str | Path): Path to the .d directory.
 
     Returns:
-    List[Chromatogram]
-        List of parsed Chromatogram objects.
+        list[Chromatogram]: List of parsed Chromatogram objects.
     """
     # if the dir doesn't end with .d or is nto a directory, raise an error
     if not path_dir.is_dir() or not path_dir.name.lower().endswith(".d"):
@@ -416,12 +414,12 @@ def _parse_acmd_channel_mapping(dx_open: zipfile.ZipFile) -> dict[str, str]:
 def parse_agilent_dx(file_path) -> list[Chromatogram]:
     """
     Parses Agilent .dx files to a list of Chromatogram objects.
-    #todo: add additonal docs
 
     Args:
         file_path (str | Path): Path to the .dx file.
+
     Returns:
-        List[Chromatogram]: List of parsed chromatogram objects.
+        list[Chromatogram]: List of parsed Chromatogram objects.
     """
     # check if file is a .dx file
     path = Path(file_path)
