@@ -4,7 +4,9 @@ Data processing functions for chromatogram analysis
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING
+from typing import Callable
 
 import pandas as pd
 from scipy.integrate import trapezoid
@@ -12,8 +14,18 @@ from scipy.integrate import trapezoid
 if TYPE_CHECKING:
     from .objects import ChannelChromatograms, Chromatogram
 
+BaselineFunction = Callable[..., pd.Series]
+_BASELINE_FUNCTIONS: dict[str, BaselineFunction] = {}
+
+
+def register_baseline(func: BaselineFunction) -> BaselineFunction:
+    """Register a baseline function for discovery."""
+    _BASELINE_FUNCTIONS[func.__name__] = func
+    return func
+
 
 # Baseline functions
+@register_baseline
 def min_subtract(data: pd.DataFrame) -> pd.Series:
     """
     Simple minimum subtraction baseline correction
@@ -28,6 +40,7 @@ def min_subtract(data: pd.DataFrame) -> pd.Series:
     return signal - signal.min()
 
 
+@register_baseline
 def time_window_baseline(
     data: pd.DataFrame, time_window: tuple[float, float] = (0, 1)
 ) -> pd.Series:
@@ -52,6 +65,7 @@ def time_window_baseline(
     return data[signal_col] - baseline_value  # type: ignore[operator]
 
 
+@register_baseline
 def time_point_baseline(data: pd.DataFrame, time_point: float) -> pd.Series:
     """
     Use signal value at a specific time point as baseline
@@ -74,6 +88,7 @@ def time_point_baseline(data: pd.DataFrame, time_point: float) -> pd.Series:
     return data[signal_col] - baseline_value  # type: ignore[operator]
 
 
+@register_baseline
 def linear_baseline(
     data: pd.DataFrame, start_time: float, end_time: float
 ) -> pd.Series:
@@ -353,11 +368,27 @@ def split_chromatogram(
     return split_chromatograms
 
 
-def list_baseline_functions():
-    baseline_functions = [
-        "min_subtract",
-        "time_window_baseline",
-        "time_point_baseline",
-        "linear_baseline",
-    ]
-    return "\n".join(baseline_functions)
+def list_baseline_functions(verbose: bool = False) -> str:
+    """List available baseline functions.
+
+    Args:
+        verbose: If True, include each function docstring in the output.
+
+    Returns:
+        String with one baseline function per block.
+    """
+    baseline_names = list(_BASELINE_FUNCTIONS)
+    if not verbose:
+        output = "\n".join(baseline_names)
+        print(output)
+        return output
+
+    formatted_functions = []
+    for name in baseline_names:
+        docstring = inspect.getdoc(_BASELINE_FUNCTIONS[name]) or "No docstring provided."
+        doc_block = "\n".join(f"    {line}" for line in docstring.splitlines())
+        formatted_functions.append(f"{name}\n{doc_block}")
+
+    output = "\n\n".join(formatted_functions)
+    print(output)
+    return output
