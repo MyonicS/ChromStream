@@ -17,7 +17,7 @@ class Chromatogram:
     injection_time: pd.Timestamp
     metadata: dict
     channel: str
-    path: Path | str
+    path: Path | str | None
 
     # extra properties
     @property
@@ -143,6 +143,7 @@ class ChannelChromatograms:
         if len(self.chromatograms) > 0:
             # Use any chromatogram to get column names
             sample_chrom = next(iter(self.chromatograms.values()))
+            # todo: consider handling edge cases with no signal unit sepcified and add this logic to the Chromatogram class as well
             ax.set_xlabel(
                 "Time (" + sample_chrom.metadata["time_unit"] + ")"
                 if "time_unit" in sample_chrom.metadata
@@ -282,6 +283,7 @@ class Experiment:
                 - A list of Chromatogram objects
                 - A list of paths to chromatogram files
                 - A path to a .d directory containing .ch files
+                - A path to a .dx archive containing .ch files
             channel_name: Optional channel name to override for all chromatograms
         """
         # Convert single path to Path object if needed
@@ -289,20 +291,28 @@ class Experiment:
             path = Path(chromatograms)
             # Check if it's a .d directory
             if path.is_dir() and path.name.lower().endswith(".d"):
-                from .parsers.agilent import chromlist_from_dot_d
+                from .parsers.agilent import parse_agilent_dot_d
 
-                chrom_list = chromlist_from_dot_d(path)
-                for chrom in chrom_list:
-                    self.add_chromatogram(chrom, channel_name=channel_name)
+                chrom_list = parse_agilent_dot_d(path)
+            # Check if it's a .dx archive
+            elif path.is_file() and path.suffix.lower() == ".dx":
+                from .parsers.agilent import parse_agilent_dx
+
+                chrom_list = parse_agilent_dx(path)
             else:
-                raise ValueError(f"Path must be a .d directory. Got: {chromatograms}")
+                raise ValueError(
+                    f"Path must be a .d directory or .dx file. Got: {chromatograms}"
+                )
+
+            for chrom in chrom_list:
+                self.add_chromatogram(chrom, channel_name=channel_name)
         elif isinstance(chromatograms, list):
             # Handle list of chromatograms or paths
             for chrom in chromatograms:
                 self.add_chromatogram(chrom, channel_name=channel_name)
         else:
             raise ValueError(
-                "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory"
+                "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory/.dx file"
             )
 
     def plot_chromatograms(self, ax=None, channels: str | list = "all", **kwargs):
