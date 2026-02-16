@@ -354,7 +354,7 @@ def parse_agilent_ch(file_path, file_name=None, channel_name=None) -> Chromatogr
     )
 
 
-def chromlist_from_dot_d(path_dir: Path) -> list[Chromatogram]:
+def parse_agilent_dot_d(path_dir: Path) -> list[Chromatogram]:
     """
     Given a path to a Chromeleon .d directory, parses all chromatogram files
     and returns a list of Chromatogram objects.
