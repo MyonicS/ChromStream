@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 from pathlib import Path
 from chromstream.parsers import (
     parse_chromatogram_txt,
+    parse_chromatogram,
     parse_MTO_asc,
     parse_log_file,
     parse_log_MTO,
+    parse_agilent_ch,
+    parse_agilent_dx,
 )
 
 # Test data directories
@@ -164,3 +168,73 @@ class TestLogParsers:
         assert isinstance(log_df, pd.DataFrame)
         assert not log_df.empty
         assert "Timestamp" in log_df.columns
+
+
+class TestAgilentParsers:
+    """Test Agilent file parsing functions"""
+
+    def test_parse_ch_file_direct(self):
+        """Test direct parsing of Agilent .ch files"""
+        file_path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        chrom = parse_agilent_ch(file_path)
+
+        assert chrom is not None
+        assert isinstance(chrom.data, pd.DataFrame)
+        assert not chrom.data.empty
+        assert chrom.injection_time is not None
+        assert chrom.path is not None
+        assert chrom.channel == "FID1A"
+
+    def test_parse_ch_file_with_channel_override(self):
+        """Test channel name override for Agilent .ch parser"""
+        file_path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        chrom = parse_agilent_ch(file_path, channel_name="CustomFID")
+
+        assert chrom.channel == "CustomFID"
+
+    def test_parse_dx_file(self):
+        """Test parsing .dx file"""
+        file_path = TEST_DATA_DIR / "test_dx.dx"
+        chrom_list = parse_agilent_dx(file_path)
+
+        # Verify we get a list of chromatograms
+        assert chrom_list is not None
+        assert isinstance(chrom_list, list)
+        assert len(chrom_list) > 0
+
+        # Verify each chromatogram has required attributes
+        for chrom in chrom_list:
+            assert chrom.data is not None
+            assert isinstance(chrom.data, pd.DataFrame)
+            assert not chrom.data.empty
+            assert chrom.injection_time is not None
+            assert chrom.channel is not None
+
+
+class TestAutoChromatogramParser:
+    """Test parser dispatch for single chromatogram files."""
+
+    def test_parse_chromeleon_txt_file(self):
+        file_path = TEST_DATA_DIR / "format_1.txt"
+        chrom = parse_chromatogram(file_path)
+
+        assert chrom is not None
+        assert isinstance(chrom.data, pd.DataFrame)
+        assert not chrom.data.empty
+        assert chrom.injection_time is not None
+        assert chrom.channel is not None
+
+    def test_parse_agilent_ch_file(self):
+        file_path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        chrom = parse_chromatogram(file_path)
+
+        assert chrom is not None
+        assert isinstance(chrom.data, pd.DataFrame)
+        assert not chrom.data.empty
+        assert chrom.injection_time is not None
+        assert chrom.channel is not None
+
+    def test_reject_non_chromeleon_txt_file(self):
+        file_path = LOG_DATA_DIR / "Log_1.txt"
+        with pytest.raises(ValueError):
+            parse_chromatogram(file_path)
