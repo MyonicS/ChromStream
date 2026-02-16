@@ -223,3 +223,14 @@ class TestExperimentBasics:
         assert len(channel_names) == 2
         assert "FID_left" in channel_names
         assert "FID_right" in channel_names
+
+    def test_experiment_add_mult_chromatograms_from_dx(self):
+        """Test adding multiple chromatograms from a .dx file"""
+        exp = Experiment(name="Test")
+        file_path = TEST_DATA_DIR / "test_dx.dx"
+
+        exp.add_mult_chromatograms(file_path)
+
+        assert len(exp.channels) > 0
+        total_chroms = sum(len(channel.chromatograms) for channel in exp.channels.values())
+        assert total_chroms > 0
