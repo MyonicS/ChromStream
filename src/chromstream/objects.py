@@ -45,10 +45,12 @@ class Chromatogram:
         # Choose which column to plot (default to second column)
         y_column = self.data.columns[1] if column is None else column
         x_column = self.data.columns[0]
+        time_unit = self.time_unit
+        signal_unit = self.signal_unit
 
         ax.plot(self.data[x_column], self.data[y_column], **kwargs)
-        ax.set_xlabel(x_column)
-        ax.set_ylabel(y_column)
+        ax.set_xlabel(f"Time ({time_unit})" if time_unit != "unknown" else "Time")
+        ax.set_ylabel(f"Signal ({signal_unit})" if signal_unit != "unknown" else "Signal")
         ax.set_title(f"Chromatogram - {self.channel} - {self.path}")
 
         return ax
@@ -143,16 +145,13 @@ class ChannelChromatograms:
         if len(self.chromatograms) > 0:
             # Use any chromatogram to get column names
             sample_chrom = next(iter(self.chromatograms.values()))
-            # todo: consider handling edge cases with no signal unit sepcified and add this logic to the Chromatogram class as well
+            time_unit = sample_chrom.time_unit
+            signal_unit = sample_chrom.signal_unit
             ax.set_xlabel(
-                "Time (" + sample_chrom.metadata["time_unit"] + ")"
-                if "time_unit" in sample_chrom.metadata
-                else "Time"
+                f"Time ({time_unit})" if time_unit != "unknown" else "Time"
             )
             ax.set_ylabel(
-                "Signal (" + sample_chrom.metadata["Signal Unit"] + ")"
-                if "Signal Unit" in sample_chrom.metadata
-                else "Signal"
+                f"Signal ({signal_unit})" if signal_unit != "unknown" else "Signal"
             )
         else:
             ax.set_xlabel("Time")
