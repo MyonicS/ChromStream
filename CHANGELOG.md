@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [0.1.0]
 
-- Added parsing of Agilent .cd / .dx and .d directories, see new [parsing notebook](https://myonics.github.io/ChromStream/getting_started/parsing.html)
+- Added parsing of Agilent .cd / .dx and .d directories, see new [parsing notebook](https://myonics.github.io/ChromStream/notebooks/parsing.html)
 - extra tests
 - minor cleanup
 
