@@ -8,7 +8,10 @@ A Python package for processing on-line gas chromatography data. ChromStream pro
 
 ## Features
 
-- Parse chromatographic data from multiple formats (Chromeleon, FID, etc.)
+- Parse chromatographic data from multiple formats:
+  - Chromeleon (exported txt)
+  - Agilent .d directories
+  - Agilent .dx files
 - Access to data at experiment, channel and chromatogram level
 - Quick plotting of chromatograms
 - Small selection of baseline corrections, possibility to use custom ones
@@ -76,7 +79,7 @@ Check out the `example_notebooks/` directory for comprehensive examples:
 ## Roadmap
 - Support for more files formats
 - Addition of more data sources such as spectroscopy
-- JSON saving and parsings
+- JSON/HDF5 saving and parsings
 - tests
 
 ## Contributing
@@ -86,6 +89,6 @@ PRs are more than welcome.
 
 ## Authors
 
-Sebastian Rejman - Utrecht University
+Sebastian Rejman - Fritz-Haber-Institute / Utrecht University
 
 
