@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 from pathlib import Path
 from chromstream.parsers import (
     parse_chromatogram_txt,
+    parse_chromatogram,
     parse_MTO_asc,
     parse_log_file,
     parse_log_MTO,
@@ -187,3 +189,32 @@ class TestAgilentParsers:
             assert not chrom.data.empty
             assert chrom.injection_time is not None
             assert chrom.channel is not None
+
+
+class TestAutoChromatogramParser:
+    """Test parser dispatch for single chromatogram files."""
+
+    def test_parse_chromeleon_txt_file(self):
+        file_path = TEST_DATA_DIR / "format_1.txt"
+        chrom = parse_chromatogram(file_path)
+
+        assert chrom is not None
+        assert isinstance(chrom.data, pd.DataFrame)
+        assert not chrom.data.empty
+        assert chrom.injection_time is not None
+        assert chrom.channel is not None
+
+    def test_parse_agilent_ch_file(self):
+        file_path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        chrom = parse_chromatogram(file_path)
+
+        assert chrom is not None
+        assert isinstance(chrom.data, pd.DataFrame)
+        assert not chrom.data.empty
+        assert chrom.injection_time is not None
+        assert chrom.channel is not None
+
+    def test_reject_non_chromeleon_txt_file(self):
+        file_path = LOG_DATA_DIR / "Log_1.txt"
+        with pytest.raises(ValueError):
+            parse_chromatogram(file_path)

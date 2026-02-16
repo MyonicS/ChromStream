@@ -4,6 +4,7 @@ from .chromeleon import (
     parse_chromatogram_txt,
     parse_to_channel,
 )
+from .dispatch import parse_chromatogram
 from .other_files import (
     parse_MTO_metadata,
     parse_MTO_asc,
