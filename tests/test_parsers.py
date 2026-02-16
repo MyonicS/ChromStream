@@ -9,6 +9,7 @@ from chromstream.parsers import (
     parse_MTO_asc,
     parse_log_file,
     parse_log_MTO,
+    parse_agilent_ch,
     parse_agilent_dx,
 )
 
@@ -171,6 +172,25 @@ class TestLogParsers:
 
 class TestAgilentParsers:
     """Test Agilent file parsing functions"""
+
+    def test_parse_ch_file_direct(self):
+        """Test direct parsing of Agilent .ch files"""
+        file_path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        chrom = parse_agilent_ch(file_path)
+
+        assert chrom is not None
+        assert isinstance(chrom.data, pd.DataFrame)
+        assert not chrom.data.empty
+        assert chrom.injection_time is not None
+        assert chrom.path is not None
+        assert chrom.channel == "FID1A"
+
+    def test_parse_ch_file_with_channel_override(self):
+        """Test channel name override for Agilent .ch parser"""
+        file_path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        chrom = parse_agilent_ch(file_path, channel_name="CustomFID")
+
+        assert chrom.channel == "CustomFID"
 
     def test_parse_dx_file(self):
         """Test parsing .dx file"""
