@@ -62,7 +62,7 @@ exp.channels['channel-name'].chromatograms[0].plot()
 ChromStream currently supports parsing data from:
 
 - Chromeleon software exports (`.txt`)
-- (software names) (ascii files)
+- Agilent .d directories and .dx files
 - simple log files (e.g. exported from labview)
 
 ## Documentation
@@ -74,6 +74,7 @@ ChromStream currently supports parsing data from:
 Check out the `example_notebooks/` directory for comprehensive examples:
 
 - `example_calibration.ipynb` - GC calibration procedures
+- `cracking_example.ipynb` - full procedure for analyzing a cracking dataset
 
 
 ## Roadmap
