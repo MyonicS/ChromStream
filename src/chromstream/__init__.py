@@ -10,6 +10,8 @@ from .objects import *
 
 from .data_processing import *
 
+from .writers import *
+
 
 # Load the version
 __version__ = version("chromstream")

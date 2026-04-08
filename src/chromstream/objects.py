@@ -33,6 +33,8 @@ class Chromatogram:
     def signal_unit(self) -> str:
         if "Signal Unit" in self.metadata:
             return self.metadata["Signal Unit"]
+        elif "signal_unit" in self.metadata:
+            return self.metadata["signal_unit"]
         else:
             log.warning("Signal unit not found in metadata")
             return "unknown"
@@ -216,12 +218,21 @@ class Experiment:
     """Data for a single experiment containing multiple on-line GC channels"""
 
     name: str
+    schema: str = "chromstream-experiment/v0.1.0"
+    author: str | None = None
+    creation_date: pd.Timestamp | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
     channels: dict[str, ChannelChromatograms] = field(default_factory=dict)
     experiment_starttime: pd.Timestamp | None = None
     experiment_endtime: pd.Timestamp | None = None
     log: pd.DataFrame | None = None
 
     # Methods
+    @property
+    def label(self) -> str:
+        """Alias for the experiment name when persisted to file formats."""
+        return self.name
+
     @property
     def channel_names(self) -> list[str]:
         """Get a list of channel names in the experiment"""
@@ -313,6 +324,12 @@ class Experiment:
             raise ValueError(
                 "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory/.dx file"
             )
+
+    def to_hdf5(self, path: Path | str, *, overwrite: bool = False) -> Path:
+        """Write this experiment to a single HDF5 file."""
+        from .writers.hdf5_writer import write_experiment_hdf5
+
+        return write_experiment_hdf5(self, path, overwrite=overwrite)
 
     def plot_chromatograms(self, ax=None, channels: str | list = "all", **kwargs):
         if ax is None:
