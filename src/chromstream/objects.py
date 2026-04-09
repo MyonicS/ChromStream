@@ -336,7 +336,7 @@ class Experiment:
         Args:
             path: The path to the HDF5 file to write.
             overwrite: If True, overwrite the file if it exists.
-            compression: The compression algorithm to use for datasets. Available options include "gzip", "lzf", or None for no compression. Compression can reduce file size but may increase read/write time.
+            compression: The compression algorithm to use for datasets. Available options include "gzip", "lzf", or None for no compression. Compression can reduce file size but may increase read/write time. Turned on by default with "gzip". Set to None to disable compression.
         """
 
         from .writers.hdf5_writer import write_experiment_hdf5

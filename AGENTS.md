@@ -18,6 +18,7 @@ Future agents should treat this as a scientific data library first, not a generi
 - `src/chromstream/parsers/chromeleon.py`: Chromeleon `.txt` parsing and injection-time parsing.
 - `src/chromstream/parsers/agilent.py`: Agilent `.ch`, `.d`, and `.dx` parsing.
 - `src/chromstream/parsers/dispatch.py`: single-file parser dispatch for supported chromatogram files.
+- `src/chromstream/parsers/hdf5.py`: strict parser for ChromStream HDF5 experiment files.
 - `src/chromstream/parsers/other_files.py`: MTO ASCII parser and several log-file parsers.
 - `src/chromstream/writers/hdf5_writer.py`: HDF5 export for `Experiment`.
 - `tests/`: pytest suite with representative sample files in `tests/testdata/`.
@@ -47,6 +48,8 @@ Many methods rely on column order rather than column names. Do not reorder colum
 - `parse_chromatogram(path)` in `parsers/dispatch.py` currently supports:
   - Agilent `.ch`
   - Chromeleon `.txt` only when the file content matches expected chromatogram metadata
+- `parse_experiment_hdf5(path)` reads ChromStream HDF5 experiment files and currently accepts only schema `chromstream-experiment/v0.1.0`.
+- The HDF5 parser verifies that the file is a ChromStream HDF5 file before attempting schema-specific parsing.
 - `Experiment.add_chromatogram(...)` does not use the dispatch helper for all formats:
   - `.ch` goes to `parse_agilent_ch`
   - all other file paths currently go to `parse_chromatogram_txt`
@@ -71,6 +74,7 @@ If you add a new chromatogram format, update the parser, the dispatch layer, and
 ### Persistence
 
 - `Experiment.to_hdf5()` delegates to `write_experiment_hdf5(...)`.
+- ChromStream supports strict HDF5 round-tripping for the current experiment schema via `write_experiment_hdf5(...)` and `parse_experiment_hdf5(...)`.
 - HDF5 layout is:
   - file attrs for experiment metadata
   - `Channels/<channel>/injections/inj-XXXX`
@@ -100,7 +104,7 @@ Fallback without `uv`:
 Baseline status at the time this file was written:
 
 - `uv run pytest` passes
-- 44 tests passing
+- 50 tests passing
 
 ## Testing Expectations
 
@@ -168,4 +172,5 @@ Common future changes and the files they usually require:
 - Documentation is configured in `mkdocs.yml`.
 - API reference pages are generated via `docs/gen_ref_pages.py`.
 - User-facing examples live mostly in notebooks under `docs/notebooks/`.
+- The docs use sample parsing data from `tests/testdata/`, including `tests/testdata/chroms/test_dx.h5` for HDF5 parsing examples.
 - If you change public API or supported formats, update both docs and tests in the same change.

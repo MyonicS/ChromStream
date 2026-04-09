@@ -13,6 +13,7 @@ nav:
           - resources/examples.md
           - notebooks/example_calibration.ipynb
           - notebooks/cracking_example.ipynb
+          - notebooks/exporting_hdf5.ipynb
   - Code Documentation: reference/ # keep me!
   - Development:
       - development/contributing.md
