@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import h5py
 import pandas as pd
 import pytest
@@ -31,7 +29,7 @@ def make_chromatogram(
 def make_experiment() -> Experiment:
     experiment = Experiment(
         name="Hydrogenation Run",
-        schema="chromstream-experiment/v1",
+        schema="chromstream-experiment/v0.1.0",
         author="Ada Lovelace",
         creation_date=pd.Timestamp("2024-01-01T12:00:00Z"),
         metadata={"lab": "FHI", "run_id": 42},
@@ -86,7 +84,7 @@ def test_write_experiment_hdf5_writes_expected_layout(tmp_path):
     assert output_path.exists()
 
     with h5py.File(output_path, "r") as hdf:
-        assert hdf.attrs["schema"] == "chromstream-experiment/v1"
+        assert hdf.attrs["schema"] == "chromstream-experiment/v0.1.0"
         assert hdf.attrs["label"] == "Hydrogenation Run"
         assert hdf.attrs["creation_date"] == "2024-01-01T12:00:00+00:00"
         assert hdf.attrs["author"] == "Ada Lovelace"
