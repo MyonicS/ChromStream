@@ -45,6 +45,10 @@ def write_experiment_hdf5(
         compression: The compression algorithm to use for datasets. Available options include "gzip", "lzf", or None for no compression. Compression can reduce file size but may increase read/write time.
     """
     output_path = Path(path)
+    if output_path.exists() and not overwrite:
+        raise FileExistsError(
+            f"File {output_path!r} already exists. Set overwrite=True to overwrite it."
+        )
 
     overlapping_keys = _RESERVED_ATTRS.intersection(experiment.metadata)
     if overlapping_keys:
