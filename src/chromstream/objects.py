@@ -52,7 +52,9 @@ class Chromatogram:
 
         ax.plot(self.data[x_column], self.data[y_column], **kwargs)
         ax.set_xlabel(f"Time ({time_unit})" if time_unit != "unknown" else "Time")
-        ax.set_ylabel(f"Signal ({signal_unit})" if signal_unit != "unknown" else "Signal")
+        ax.set_ylabel(
+            f"Signal ({signal_unit})" if signal_unit != "unknown" else "Signal"
+        )
         ax.set_title(f"Chromatogram - {self.channel} - {self.path}")
 
         return ax
@@ -149,9 +151,7 @@ class ChannelChromatograms:
             sample_chrom = next(iter(self.chromatograms.values()))
             time_unit = sample_chrom.time_unit
             signal_unit = sample_chrom.signal_unit
-            ax.set_xlabel(
-                f"Time ({time_unit})" if time_unit != "unknown" else "Time"
-            )
+            ax.set_xlabel(f"Time ({time_unit})" if time_unit != "unknown" else "Time")
             ax.set_ylabel(
                 f"Signal ({signal_unit})" if signal_unit != "unknown" else "Signal"
             )
@@ -325,11 +325,25 @@ class Experiment:
                 "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory/.dx file"
             )
 
-    def to_hdf5(self, path: Path | str, *, overwrite: bool = False) -> Path:
-        """Write this experiment to a single HDF5 file."""
+    def to_hdf5(
+        self,
+        path: Path | str,
+        *,
+        overwrite: bool = False,
+        compression: str | None = "gzip",
+    ) -> Path:
+        """Write this experiment to a single HDF5 file.
+        Args:
+            path: The path to the HDF5 file to write.
+            overwrite: If True, overwrite the file if it exists.
+            compression: The compression algorithm to use for datasets. Available options include "gzip", "lzf", or None for no compression. Compression can reduce file size but may increase read/write time.
+        """
+
         from .writers.hdf5_writer import write_experiment_hdf5
 
-        return write_experiment_hdf5(self, path, overwrite=overwrite)
+        return write_experiment_hdf5(
+            self, path, overwrite=overwrite, compression=compression
+        )
 
     def plot_chromatograms(self, ax=None, channels: str | list = "all", **kwargs):
         if ax is None:

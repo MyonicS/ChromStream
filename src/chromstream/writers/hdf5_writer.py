@@ -27,10 +27,23 @@ def _normalize_attr_value(value: object) -> str | int | float | bool | bytes:
         "Experiment metadata values must be scalar HDF5-compatible values. "
         f"Unsupported value {value!r} of type {type(value).__name__}."
     )
+
+
 def write_experiment_hdf5(
-    experiment: Experiment, path: str | Path, *, overwrite: bool = False
+    experiment: Experiment,
+    path: str | Path,
+    *,
+    overwrite: bool = False,
+    compression: str | None = None,
 ) -> Path:
-    """Write a single Experiment object to an HDF5 file."""
+    """Write a single Experiment object to an HDF5 file.
+
+    Args:
+        experiment: The Experiment object to write.
+        path: The path to the HDF5 file to write.
+        overwrite: If True, overwrite the file if it exists.
+        compression: The compression algorithm to use for datasets. Available options include "gzip", "lzf", or None for no compression. Compression can reduce file size but may increase read/write time.
+    """
     output_path = Path(path)
 
     overlapping_keys = _RESERVED_ATTRS.intersection(experiment.metadata)
@@ -68,9 +81,9 @@ def write_experiment_hdf5(
                         f"Chromatogram for channel {channel_name!r} injection "
                         f"{injection_key!r} must have at least two columns."
                     )
-
-                retention_time_column = chromatogram.data.columns[0] # assuming the first column is retention time!
-                signal_column = chromatogram.data.columns[1] # assuming the second column is signal!
+                # assuming the first and second columns of the chromatogram data are retention time and signal
+                ret_time_column = chromatogram.data.columns[0]
+                signal_column = chromatogram.data.columns[1]
 
                 injection_group = injections_group.create_group(
                     f"inj-{injection_key:04d}"
@@ -89,14 +102,16 @@ def write_experiment_hdf5(
 
                 retention_time_dataset = injection_group.create_dataset(
                     "retention_time",
-                    data=chromatogram.data[retention_time_column].to_numpy(),
+                    data=chromatogram.data[ret_time_column].to_numpy(),
+                    compression=compression,
                 )
                 retention_time_dataset.attrs["unit"] = chromatogram.time_unit
-                retention_time_dataset.attrs["column_name"] = retention_time_column
+                retention_time_dataset.attrs["column_name"] = ret_time_column
 
                 signal_dataset = injection_group.create_dataset(
                     "signal",
                     data=chromatogram.data[signal_column].to_numpy(),
+                    compression=compression,
                 )
                 signal_dataset.attrs["unit"] = chromatogram.signal_unit
                 signal_dataset.attrs["column_name"] = signal_column
