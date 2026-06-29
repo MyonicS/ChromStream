@@ -7,7 +7,9 @@ from chromstream.objects import ChannelChromatograms
 from typing import Optional
 
 
-def parse_chromeleon_txt(file_path: str | Path) -> tuple[dict[str, str], pd.DataFrame]:
+def parse_chromeleon_txt(
+    file_path: str | Path,
+) -> tuple[dict[str, str], pd.DataFrame]:
     """
     Parses a txt file exporeted using chromeleon software into a dict of metadata and pd.DataFrame for chromatogram data.
 
@@ -122,7 +124,9 @@ def parse_chromeleon_txt(file_path: str | Path) -> tuple[dict[str, str], pd.Data
     return metadata, chromatogram_df
 
 
-def parse_inject_time(inject_time: str, metadata: dict) -> pd.Timestamp:
+def parse_inject_time(
+    inject_time: str, metadata: dict, dayfirst: bool = True
+) -> pd.Timestamp:
     """
     Parses the injeciton time for chromeleon txt files into a pd.Timestamp object.
     The file most likely adopts the datatime format of the machine, meaning it can be very different between machines.
@@ -131,21 +135,30 @@ def parse_inject_time(inject_time: str, metadata: dict) -> pd.Timestamp:
     Args:
         inject_time (pd.Timestamp): The Inject Time timestamp to parse.
         metadata (dict): Metadata dictionary containing additional information.
+        dayfirst (bool): Default day/month order used only when the date is
+            genuinely ambiguous (both components <=12) and can't be resolved
+            from the data itself. Defaults to True.
 
     Returns:
         pd.Timestamp: Parsed datetime object.
     """
-    # Check for format like '7/17/2023 3:35:22 PM +02:00'
-    if re.match(
-        r"\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} (AM|PM) \+\d{2}:\d{2}", inject_time
-    ):
-        return pd.to_datetime(inject_time).tz_localize(None)
-
-    # Check for format like '17-1-2023 16:45:42 +01:00'
-    if re.match(r"\d{1,2}-\d{1,2}-\d{4} \d{2}:\d{2}:\d{2} \+\d{2}:\d{2}", inject_time):
-        return pd.to_datetime(inject_time, format="%d-%m-%Y %H:%M:%S %z").tz_localize(
-            None
-        )
+    # Full date+time string, e.g. '7/17/2023 3:35:22 PM +02:00',
+    # '17-1-2023 16:45:42 +01:00', '17/07/2023 15:35:22 +0200'.
+    # Day/month order depends on the exporting machine's OS locale. Where one
+    # of the two components is >12 the order is unambiguous and can be read
+    # straight from the data instead of guessed; only fall back to the
+    # configured `dayfirst` default when both components are <=12.
+    date_match = re.match(r"(\d{1,2})[/-](\d{1,2})[/-]\d{4}", inject_time)
+    if date_match:
+        first, second = int(date_match.group(1)), int(date_match.group(2))
+        if first > 12:
+            resolved_dayfirst = True
+        elif second > 12:
+            resolved_dayfirst = False
+        else:
+            resolved_dayfirst = dayfirst
+        parsed = pd.to_datetime(inject_time, dayfirst=resolved_dayfirst)
+        return parsed.tz_localize(None) if parsed.tzinfo is not None else parsed
 
     # Check for format like '1:43:35 PM' and require metadata for the date
     if re.match(r"\d{1,2}:\d{2}:\d{2} (AM|PM)", inject_time):
@@ -181,7 +194,8 @@ def parse_inject_time(inject_time: str, metadata: dict) -> pd.Timestamp:
     else:
         try:
             # Attempt to parse as ISO 8601 format
-            time = pd.to_datetime(inject_time).tz_localize(None)
+            # dayfirst is treated as default.
+            time = pd.to_datetime(inject_time, dayfirst=dayfirst).tz_localize(None)
             log.info(f"Time format not handled, but succeeded parsing with: {time}")
             return time
         except Exception:
