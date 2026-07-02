@@ -3,30 +3,38 @@ from __future__ import annotations
 from pathlib import Path
 
 import h5py
-import numpy as np
 import pandas as pd
 
-from chromstream.objects import Experiment
+from chromstream.hdf5_common import (
+    RESERVED_CHROMATOGRAM_ATTRS,
+    RESERVED_EXPERIMENT_ATTRS,
+    _to_hdf5_attr,
+    _write_channel_group,
+    _write_chromatogram_group,
+)
+from chromstream.objects import (
+    SCHEMA_CHANNEL,
+    SCHEMA_CHROMATOGRAM,
+    ChannelChromatograms,
+    Chromatogram,
+    Experiment,
+)
 
-__all__ = ["write_experiment_hdf5"]
+__all__ = [
+    "write_channel_hdf5",
+    "write_chromatogram_hdf5",
+    "write_experiment_hdf5",
+]
 
-_RESERVED_ATTRS = frozenset({"schema", "label", "creation_date", "author"})
 
-
-def _normalize_attr_value(value: object) -> str | int | float | bool | bytes:
-    """Convert supported Python values to HDF5-compatible scalar attributes."""
-    if isinstance(value, pd.Timestamp):
-        return value.isoformat()
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, np.generic):
-        value = value.item()
-    if isinstance(value, (str, int, float, bool, bytes)):
-        return value
-    raise TypeError(
-        "Experiment metadata values must be scalar HDF5-compatible values. "
-        f"Unsupported value {value!r} of type {type(value).__name__}."
-    )
+def _open_for_write(path: str | Path, overwrite: bool) -> tuple[Path, str]:
+    """Resolve the output path and open mode, refusing to clobber unless allowed."""
+    output_path = Path(path)
+    if output_path.exists() and not overwrite:
+        raise FileExistsError(
+            f"File {output_path!r} already exists. Set overwrite=True to overwrite it."
+        )
+    return output_path, "w" if overwrite else "x"
 
 
 def write_experiment_hdf5(
@@ -36,7 +44,9 @@ def write_experiment_hdf5(
     overwrite: bool = False,
     compression: str | None = None,
 ) -> Path:
-    """Write a single Experiment object to an HDF5 file.
+    """
+    Write a single Experiment object to an HDF5 file.
+    Assumptions: Col 0 is retention time, Col 1 is signal. All other columns are ignored.
 
     Args:
         experiment: The Experiment object to write.
@@ -44,20 +54,14 @@ def write_experiment_hdf5(
         overwrite: If True, overwrite the file if it exists.
         compression: The compression algorithm to use for datasets. Available options include "gzip", "lzf", or None for no compression. Compression can reduce file size but may increase read/write time.
     """
-    output_path = Path(path)
-    if output_path.exists() and not overwrite:
-        raise FileExistsError(
-            f"File {output_path!r} already exists. Set overwrite=True to overwrite it."
-        )
+    output_path, mode = _open_for_write(path, overwrite)
 
-    overlapping_keys = _RESERVED_ATTRS.intersection(experiment.metadata)
+    overlapping_keys = RESERVED_EXPERIMENT_ATTRS.intersection(experiment.metadata)
     if overlapping_keys:
         reserved = ", ".join(sorted(overlapping_keys))
         raise ValueError(
             f"Experiment metadata contains reserved attribute names: {reserved}."
         )
-
-    mode = "w" if overwrite else "x"
 
     with h5py.File(output_path, mode) as hdf:
         hdf.attrs["schema"] = experiment.schema
@@ -70,54 +74,79 @@ def write_experiment_hdf5(
             hdf.attrs["author"] = experiment.author
         # adding other experiment metadata, checking for conflicts with reserved attribute names
         for key, value in experiment.metadata.items():
-            hdf.attrs[key] = _normalize_attr_value(value)
+            hdf.attrs[key] = _to_hdf5_attr(value)
 
         channels_group = hdf.create_group("Channels")
         for channel_name, channel in experiment.channels.items():
             channel_group = channels_group.create_group(channel_name)
-            channel_group.attrs["name"] = channel_name
+            _write_channel_group(channel_group, channel, compression=compression)
 
-            injections_group = channel_group.create_group("injections")
-            for injection_key in sorted(channel.chromatograms):
-                chromatogram = channel.chromatograms[injection_key]
-                if chromatogram.data.shape[1] < 2:
-                    raise ValueError(
-                        f"Chromatogram for channel {channel_name!r} injection "
-                        f"{injection_key!r} must have at least two columns."
-                    )
-                # assuming the first and second columns of the chromatogram data are retention time and signal
-                ret_time_column = chromatogram.data.columns[0]
-                signal_column = chromatogram.data.columns[1]
+    return output_path
 
-                injection_group = injections_group.create_group(
-                    f"inj-{injection_key:04d}"
-                )
-                if chromatogram.injection_time is not None and not pd.isna(
-                    chromatogram.injection_time
-                ):
-                    injection_group.attrs["injection_time"] = pd.Timestamp(
-                        chromatogram.injection_time
-                    ).isoformat()
-                else:
-                    raise ValueError(
-                        f"Chromatogram for channel {channel_name!r} injection "
-                        f"{injection_key!r} is missing a valid injection_time."
-                    )
 
-                retention_time_dataset = injection_group.create_dataset(
-                    "retention_time",
-                    data=chromatogram.data[ret_time_column].to_numpy(),
-                    compression=compression,
-                )
-                retention_time_dataset.attrs["unit"] = chromatogram.time_unit
-                retention_time_dataset.attrs["column_name"] = ret_time_column
+def write_channel_hdf5(
+    channel: ChannelChromatograms,
+    path: str | Path,
+    *,
+    overwrite: bool = False,
+    compression: str | None = None,
+) -> Path:
+    """Write a single ChannelChromatograms object to a standalone HDF5 file.
 
-                signal_dataset = injection_group.create_dataset(
-                    "signal",
-                    data=chromatogram.data[signal_column].to_numpy(),
-                    compression=compression,
-                )
-                signal_dataset.attrs["unit"] = chromatogram.signal_unit
-                signal_dataset.attrs["column_name"] = signal_column
+    Args:
+        channel: The ChannelChromatograms object to write.
+        path: The path to the HDF5 file to write.
+        overwrite: If True, overwrite the file if it exists.
+        compression: Dataset compression ("gzip", "lzf", or None).
+    """
+    output_path, mode = _open_for_write(path, overwrite)
+
+    with h5py.File(output_path, mode) as hdf:
+        hdf.attrs["schema"] = SCHEMA_CHANNEL
+        _write_channel_group(hdf, channel, compression=compression)
+
+    return output_path
+
+
+def write_chromatogram_hdf5(
+    chromatogram: Chromatogram,
+    path: str | Path,
+    *,
+    injection_index: int | None = None,
+    overwrite: bool = False,
+    compression: str | None = None,
+) -> Path:
+    """Write a single Chromatogram object to a standalone HDF5 file.
+
+    The full metadata dict is persisted so parsing restores it key-for-key.
+
+    Args:
+        chromatogram: The Chromatogram object to write.
+        path: The path to the HDF5 file to write.
+        injection_index: Optional channel-level injection index to persist for
+            lossless reassembly into an Experiment.
+        overwrite: If True, overwrite the file if it exists.
+        compression: Dataset compression ("gzip", "lzf", or None).
+    """
+    output_path, mode = _open_for_write(path, overwrite)
+
+    overlapping_keys = RESERVED_CHROMATOGRAM_ATTRS.intersection(chromatogram.metadata)
+    if overlapping_keys:
+        reserved = ", ".join(sorted(overlapping_keys))
+        raise ValueError(
+            f"Chromatogram metadata contains reserved attribute names: {reserved}."
+        )
+
+    with h5py.File(output_path, mode) as hdf:
+        hdf.attrs["schema"] = SCHEMA_CHROMATOGRAM
+        hdf.attrs["channel"] = chromatogram.channel
+        if injection_index is not None:
+            hdf.attrs["injection_index"] = int(injection_index)
+        # full metadata round-trip: persist every metadata key (units included)
+        for key, value in chromatogram.metadata.items():
+            hdf.attrs[key] = _to_hdf5_attr(value)
+        _write_chromatogram_group(
+            hdf, chromatogram, compression=compression, context="file root"
+        )
 
     return output_path

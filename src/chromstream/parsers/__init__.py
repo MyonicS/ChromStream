@@ -7,7 +7,11 @@ from .chromeleon import (
     parse_to_channel,
 )
 from .dispatch import parse_chromatogram
-from .hdf5 import parse_experiment_hdf5
+from .hdf5 import (
+    parse_channel_hdf5,
+    parse_chromatogram_hdf5,
+    parse_experiment_hdf5,
+)
 from .other_files import (
     parse_MTO_metadata,
     parse_MTO_asc,

@@ -8,6 +8,12 @@ from matplotlib.colors import Normalize
 from chromstream.data_processing import integrate_channel
 import logging as log
 
+# Schema identifiers for the HDF5 persistence layer. Single source of truth,
+# imported by the writer/parser so a version bump only happens here.
+SCHEMA_EXPERIMENT = "chromstream-experiment/v0.1.0"
+SCHEMA_CHANNEL = "chromstream-channel/v0.1.0"
+SCHEMA_CHROMATOGRAM = "chromstream-chromatogram/v0.1.0"
+
 
 @dataclass
 class Chromatogram:
@@ -102,6 +108,33 @@ class Chromatogram:
         from .data_processing import integrate_single_chromatogram
 
         return integrate_single_chromatogram(self, peaklist, column=column)
+
+    def to_hdf5(
+        self,
+        path: Path | str,
+        *,
+        injection_index: int | None = None,
+        overwrite: bool = False,
+        compression: str | None = "gzip",
+    ) -> Path:
+        """Write this chromatogram to a standalone HDF5 file.
+
+        Args:
+            path: The path to the HDF5 file to write.
+            injection_index: Optional channel-level injection index to persist so
+                the chromatogram can be reassembled into an Experiment losslessly.
+            overwrite: If True, overwrite the file if it exists.
+            compression: Dataset compression ("gzip", "lzf", or None).
+        """
+        from .writers.hdf5_writer import write_chromatogram_hdf5
+
+        return write_chromatogram_hdf5(
+            self,
+            path,
+            injection_index=injection_index,
+            overwrite=overwrite,
+            compression=compression,
+        )
 
 
 @dataclass
@@ -212,13 +245,33 @@ class ChannelChromatograms:
         self.integrals = integrate_channel(self, peaklist, column=column)
         return self.integrals
 
+    def to_hdf5(
+        self,
+        path: Path | str,
+        *,
+        overwrite: bool = False,
+        compression: str | None = "gzip",
+    ) -> Path:
+        """Write this channel to a standalone HDF5 file.
+
+        Args:
+            path: The path to the HDF5 file to write.
+            overwrite: If True, overwrite the file if it exists.
+            compression: Dataset compression ("gzip", "lzf", or None).
+        """
+        from .writers.hdf5_writer import write_channel_hdf5
+
+        return write_channel_hdf5(
+            self, path, overwrite=overwrite, compression=compression
+        )
+
 
 @dataclass
 class Experiment:
     """Data for a single experiment containing multiple on-line GC channels"""
 
     name: str
-    schema: str = "chromstream-experiment/v0.1.0"
+    schema: str = SCHEMA_EXPERIMENT
     author: str | None = None
     creation_date: pd.Timestamp | None = None
     metadata: dict[str, object] = field(default_factory=dict)
@@ -344,6 +397,36 @@ class Experiment:
         return write_experiment_hdf5(
             self, path, overwrite=overwrite, compression=compression
         )
+
+    def add_chromatogram_hdf5(
+        self, path: Path | str, *, channel_name: str | None = None
+    ) -> None:
+        """Add a chromatogram from a standalone HDF5 file into this experiment.
+
+        Note on injection index: a standalone chromatogram file may
+        store the ``injection_index`` it had within its channel. When that attr
+        is present we restore the chromatogram under that exact key, so writing
+        each chromatogram of an experiment to its own file and reassembling them
+        round-trips the original (possibly non-contiguous) injection numbering
+        regardless of the order the files are loaded in. When the attr is absent
+        (e.g. a hand-made file) we fall back to sequential numbering,
+        ``len(existing)``, matching ``add_chromatogram``'s behavior.
+
+        Args:
+            path: Path to a chromatogram HDF5 file written by ChromStream.
+            channel_name: Optional channel name override; defaults to the
+                channel stored on the chromatogram.
+        """
+        from .parsers.hdf5 import _parse_chromatogram_hdf5_with_index
+
+        injection_index, chrom = _parse_chromatogram_hdf5_with_index(path)
+        channel = channel_name if channel_name else chrom.channel
+        if channel not in self.channels:
+            self.channels[channel] = ChannelChromatograms(channel=channel)
+
+        if injection_index is None:
+            injection_index = len(self.channels[channel].chromatograms)
+        self.channels[channel].add_chromatogram(injection_index, chrom)
 
     def plot_chromatograms(self, ax=None, channels: str | list = "all", **kwargs):
         if ax is None:
