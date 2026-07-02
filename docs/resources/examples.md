@@ -24,3 +24,8 @@ Provides an example analysis for cracking of a light hydrocarbon
 - Estimation of partial pressures using a calibration
 - Adding data from log files (e.g. Temperature) to the analysis
 
+### [HDF5 Export](../notebooks/exporting_hdf5.ipynb)
+Shows the basic HDF5 persistence workflow:
+- Exporting an `Experiment` to `.h5`
+- Reloading the experiment with the HDF5 parser
+- Why the format is useful for compact storage and fast re-loading
