@@ -9,14 +9,16 @@ A Python package for processing on-line gas chromatography data. ChromStream pro
 ## Features
 
 - Parse chromatographic data from multiple formats:
-  - Chromeleon (exported txt)
-  - Agilent .d directories
-  - Agilent .dx files
+    - Chromeleon (exported txt)
+    - Agilent .d directories
+    - Agilent .dx files
+    - ChromStream HDF5 experiment files
 - Access to data at experiment, channel and chromatogram level
 - Quick plotting of chromatograms
 - Small selection of baseline corrections, possibility to use custom ones
 - Integration using a dict of peaks
 - Addition of logfiles
+- Export experiments to a compact HDF5 format
 
 ## Installation
 
@@ -63,7 +65,20 @@ ChromStream currently supports parsing data from:
 
 - Chromeleon software exports (`.txt`)
 - Agilent .d directories and .dx files
+- ChromStream HDF5 experiment files (`.h5`)
 - simple log files (e.g. exported from labview)
+
+ChromStream can also export `Experiment` objects to HDF5 and load them back again:
+
+```python
+import chromstream as cs
+
+exp = cs.Experiment(name="example")
+exp.add_mult_chromatograms("path-to-run.dx")
+exp.to_hdf5("example.h5")
+
+loaded = cs.parse_experiment_hdf5("example.h5")
+```
 
 ## Documentation
 
@@ -75,12 +90,13 @@ Check out the `example_notebooks/` directory for comprehensive examples:
 
 - `example_calibration.ipynb` - GC calibration procedures
 - `cracking_example.ipynb` - full procedure for analyzing a cracking dataset
+- `exporting_hdf5.ipynb` - brief example showing HDF5 export and re-loading
 
 
 ## Roadmap
 - Support for more files formats
 - Addition of more data sources such as spectroscopy
-- JSON/HDF5 saving and parsings
+- JSON persistence
 - tests
 
 ## Contributing
@@ -91,5 +107,4 @@ PRs are more than welcome.
 ## Authors
 
 Sebastian Rejman - Fritz-Haber-Institute / Utrecht University
-
 

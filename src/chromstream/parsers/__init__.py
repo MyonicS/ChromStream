@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .chromeleon import (
     parse_chromeleon_txt,
     parse_inject_time,
@@ -5,6 +7,11 @@ from .chromeleon import (
     parse_to_channel,
 )
 from .dispatch import parse_chromatogram
+from .hdf5 import (
+    parse_channel_hdf5,
+    parse_chromatogram_hdf5,
+    parse_experiment_hdf5,
+)
 from .other_files import (
     parse_MTO_metadata,
     parse_MTO_asc,
@@ -17,4 +24,4 @@ from .other_files import (
     parse_log_type_robert,
     parse_log_file,
 )
-from .agilent import *
+from .agilent import *  # noqa: F403
