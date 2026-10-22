@@ -283,6 +283,7 @@ name = "chromstream"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cmbx-reader" },
     { name = "h5py", version = "3.14.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "h5py", version = "3.16.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -326,6 +327,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "cairosvg", marker = "extra == 'docs'", specifier = ">=2.7.1" },
+    { name = "cmbx-reader", git = "https://github.com/MyonicS/cmbx-reader?branch=main" },
     { name = "h5py", specifier = ">=3.14.0" },
     { name = "ipykernel", marker = "extra == 'docs'", specifier = ">=6.30.1" },
     { name = "ipympl", marker = "extra == 'docs'", specifier = ">=0.9.7" },
@@ -382,6 +384,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/60/6c/8ca2efa64cf75a977a0d7fac081354553ebe483345c734fb6b6515d96bbc/click-8.2.1.tar.gz", hash = "sha256:27c491cc05d968d271d5a1db13e3b5a184636d9d930f148c50b038f0d0646202", size = 286342, upload-time = "2025-05-20T23:19:49.832Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/85/32/10bb5764d90a8eee674e9dc6f4db6a0ab47c8c4d0d83c27f7c39ac415a4d/click-8.2.1-py3-none-any.whl", hash = "sha256:61a3265b914e850b85317d0b3109c7f8cd35a670f963866005d6ef1d5175a12b", size = 102215, upload-time = "2025-05-20T23:19:47.796Z" },
+]
+
+[[package]]
+name = "cmbx-reader"
+version = "0.1.0"
+source = { git = "https://github.com/MyonicS/cmbx-reader?branch=main#cb44ed28b341d6f5c9b540cbea6ea2bce6f70d41" }
+dependencies = [
+    { name = "h5py", version = "3.14.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "h5py", version = "3.16.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "numpy", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [[package]]

@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-- Added parsing of binary Chromeleon 7 data: `.cmbx` archives (`parse_chromeleon_cmbx`) and raw signal files (`parse_chromeleon_raw`), including support in `parse_chromatogram` and the `Experiment` helpers
+- Added parsing of binary Chromeleon 7 data: `.cmbx` archives (`parse_chromeleon_cmbx`) and raw signal files (`parse_chromeleon_raw`), including support in `parse_chromatogram` and the `Experiment` helpers. Decoding is provided by the new dependency [cmbx-reader](https://github.com/MyonicS/cmbx-reader)
 
 ## [0.1.0]
 

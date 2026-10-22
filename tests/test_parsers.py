@@ -18,7 +18,6 @@ from chromstream.parsers import (
     parse_chromeleon_cmbx,
     parse_chromeleon_raw,
 )
-from chromstream.parsers.chromeleon_binary import _decode_svarints
 
 # Test data directories
 TEST_DATA_DIR = Path(__file__).parent / "testdata" / "chroms"
@@ -274,7 +273,7 @@ class TestChromeleonBinaryParsers:
         assert chrom.channel == "FID_left"
         # raw files store neither the signal unit nor the instrument time zone
         assert list(chrom.data.columns) == ["Time (min)", "Value"]
-        assert chrom.injection_time == pd.Timestamp("2023-09-07 13:26:11.9873556")
+        assert chrom.injection_time == pd.Timestamp("2023-09-07 13:26:11.987355")
         cmbx_chrom = parse_chromeleon_cmbx(CMBX_FILE)[0]
         np.testing.assert_array_equal(
             chrom.data["Value"].to_numpy(), cmbx_chrom.data["Value (pA)"].to_numpy()
@@ -293,14 +292,14 @@ class TestChromeleonBinaryParsers:
         assert chrom.path == CMBX_SIGNAL_RAW
         assert chrom.signal_unit == "pA"
         assert list(chrom.data.columns) == ["Time (min)", "Value (pA)"]
-        assert chrom.injection_time == pd.Timestamp("2023-09-07 15:26:11.9873556")
+        assert chrom.injection_time == pd.Timestamp("2023-09-07 15:26:11.987355")
 
     def test_reject_audit_trail_raw_file(self):
         with pytest.raises(ValueError, match="audit trail"):
             parse_chromeleon_raw(AUDIT_TRAIL_HEADER)
 
     def test_reject_unknown_raw_file(self):
-        with pytest.raises(ValueError, match="Not a Chromeleon signal file"):
+        with pytest.raises(ValueError, match="Not a raw signal file"):
             parse_chromeleon_raw(b"not a chromeleon file")
 
     def test_reject_truncated_raw_file(self):
@@ -315,15 +314,6 @@ class TestChromeleonBinaryParsers:
     def test_missing_cmbx_file(self):
         with pytest.raises(FileNotFoundError):
             parse_chromeleon_cmbx(TEST_DATA_DIR / "does_not_exist.cmbx")
-
-    def test_signed_varint_decoding(self):
-        # first byte: [continue][sign][6 bits], then [continue][7 bits]
-        values, terminators = _decode_svarints(
-            bytes([0x05, 0x45, 0xBD, 0xAF, 0xCC, 0x0E, 0xC0, 0x01, 0x40])
-        )
-
-        assert values.tolist() == [5, -5, 15305725, -64, 0]
-        assert terminators.tolist() == [False, False, False, False, True]
 
 
 class TestAutoChromatogramParser:

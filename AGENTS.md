@@ -16,7 +16,7 @@ Future agents should treat this as a scientific data library first, not a generi
 - `src/chromstream/objects.py`: core dataclasses: `Chromatogram`, `ChannelChromatograms`, `Experiment`.
 - `src/chromstream/data_processing.py`: baseline correction registry, integration helpers, log merging, chromatogram splitting.
 - `src/chromstream/parsers/chromeleon.py`: Chromeleon `.txt` parsing and injection-time parsing.
-- `src/chromstream/parsers/chromeleon_binary.py`: Chromeleon 7 `.cmbx` archive and raw signal file (`SignHdr`) parsing; the module docstring documents the reverse-engineered binary format.
+- `src/chromstream/parsers/chromeleon_binary.py`: Chromeleon 7 `.cmbx` archive and raw signal file (`SignHdr`) parsing. Decoding is done by the `cmbx-reader` dependency (https://github.com/MyonicS/cmbx-reader, which documents the binary format); this module only converts its results to `Chromatogram` objects.
 - `src/chromstream/parsers/agilent.py`: Agilent `.ch`, `.d`, and `.dx` parsing.
 - `src/chromstream/parsers/dispatch.py`: single-file parser dispatch for supported chromatogram files.
 - `src/chromstream/parsers/hdf5.py`: strict parsers for ChromStream HDF5 experiment, channel, and chromatogram files.

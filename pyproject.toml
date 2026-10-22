@@ -26,6 +26,7 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
+    "cmbx-reader>=0.1.0",
     "h5py>=3.14.0",
     "matplotlib>=3.9.4",
     "numpy",
@@ -183,6 +184,8 @@ lint.quotes = "double"
 
 [tool.uv.sources]
 chromstream = { workspace = true }
+# TODO: remove once cmbx-reader is published on PyPI
+cmbx-reader = { git = "https://github.com/MyonicS/cmbx-reader", branch = "main" }
 
 [dependency-groups]
 docs = [
