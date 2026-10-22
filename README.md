@@ -10,6 +10,7 @@ A Python package for processing on-line gas chromatography data. ChromStream pro
 
 - Parse chromatographic data from multiple formats:
     - Chromeleon (exported txt)
+    - Chromeleon 7 .cmbx archives and raw signal files
     - Agilent .d directories
     - Agilent .dx files
     - ChromStream HDF5 experiment files
@@ -64,6 +65,7 @@ exp.channels['channel-name'].chromatograms[0].plot()
 ChromStream currently supports parsing data from:
 
 - Chromeleon software exports (`.txt`)
+- Chromeleon 7 archives (`.cmbx`) and the raw signal files (`.raw`) inside them
 - Agilent .d directories and .dx files
 - ChromStream HDF5 experiment files (`.h5`)
 - simple log files (e.g. exported from labview)
