@@ -165,3 +165,19 @@ def test_parse_chromatogram_hdf5_rejects_non_chromstream_schema(tmp_path):
         ValueError, match="Only parsing of ChromStream HDF5 files is supported"
     ):
         parse_chromatogram_hdf5(output_path)
+
+
+def test_chromeleon_cmbx_chromatogram_round_trips(tmp_path):
+    from pathlib import Path
+
+    from chromstream.parsers import parse_chromeleon_cmbx
+
+    cmbx = Path(__file__).parent / "testdata" / "chroms" / "chromeleon.cmbx"
+    chrom = parse_chromeleon_cmbx(cmbx)[0]
+
+    parsed = parse_chromatogram_hdf5(chrom.to_hdf5(tmp_path / "chrom.h5"))
+
+    assert parsed.channel == chrom.channel
+    assert parsed.injection_time == chrom.injection_time
+    assert parsed.metadata["Signal Unit"] == "pA"
+    pd.testing.assert_frame_equal(parsed.data, chrom.data)

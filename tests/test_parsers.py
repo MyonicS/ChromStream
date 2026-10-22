@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import struct
+import zipfile
+
+import numpy as np
 import pandas as pd
 import pytest
 from pathlib import Path
@@ -11,11 +15,26 @@ from chromstream.parsers import (
     parse_log_MTO,
     parse_agilent_ch,
     parse_agilent_dx,
+    parse_chromeleon_cmbx,
+    parse_chromeleon_raw,
 )
+from chromstream.parsers.chromeleon_binary import _decode_svarints
 
 # Test data directories
 TEST_DATA_DIR = Path(__file__).parent / "testdata" / "chroms"
 LOG_DATA_DIR = Path(__file__).parent / "testdata" / "logs"
+
+# Chromeleon 7.3 archive (MS data and audit trail removed) and Chromeleon's text export of its signal
+CMBX_FILE = TEST_DATA_DIR / "chromeleon.cmbx"
+CMBX_TEXT_EXPORT = TEST_DATA_DIR / "chromeleon_cmbx_FID_left.txt"
+CMBX_SIGNAL_RAW = "2_152612018.raw"
+# header of a Chromeleon audit trail file (LZMA2-compressed XML, not a signal)
+AUDIT_TRAIL_HEADER = b"CpAu" + struct.pack("<HHIII", 20, 2, 0, 0, 0)
+
+
+def _read_cmbx_member(name: str) -> bytes:
+    with zipfile.ZipFile(CMBX_FILE) as archive:
+        return archive.read(name)
 
 
 class TestChromatogramParsers:
@@ -211,6 +230,102 @@ class TestAgilentParsers:
             assert chrom.channel is not None
 
 
+class TestChromeleonBinaryParsers:
+    """Test Chromeleon .cmbx archive and raw signal file parsing"""
+
+    def test_parse_cmbx_file(self):
+        chrom_list = parse_chromeleon_cmbx(CMBX_FILE)
+
+        assert len(chrom_list) == 1
+        chrom = chrom_list[0]
+        assert chrom.channel == "FID_left"
+        assert list(chrom.data.columns) == ["Time (min)", "Value (pA)"]
+        assert len(chrom.data) == 85500
+        assert chrom.injection_time == pd.Timestamp("2023-09-07 15:26:11")
+        assert chrom.time_unit == "min"
+        assert chrom.signal_unit == "pA"
+        assert chrom.path == CMBX_FILE
+        assert chrom.metadata["Sequence"] == "20230709_SR_ZB_006_PyOil"
+        assert chrom.metadata["Instrument Method"] == "Pyrolysis Oils"
+        assert chrom.metadata["Detector"] == "GC_left"
+        assert chrom.metadata["Generating Data System"] == "Chromeleon 7.3.0.60919"
+        assert chrom.metadata["Average Step (s)"] == 0.04
+
+    def test_cmbx_matches_chromeleon_text_export(self):
+        """Decoded data must equal Chromeleon's own export of the same signal"""
+        chrom = parse_chromeleon_cmbx(CMBX_FILE)[0]
+        export = parse_chromatogram_txt(CMBX_TEXT_EXPORT)
+
+        assert len(chrom.data) == int(export.metadata["Data Points"])
+        # the export rounds time to 1e-6 min, the signal is stored with 1e-6 pA resolution
+        np.testing.assert_allclose(
+            chrom.data["Time (min)"], export.data["Time (min)"], rtol=0, atol=5e-7
+        )
+        np.testing.assert_allclose(
+            chrom.data["Value (pA)"], export.data["Value (pA)"], rtol=0, atol=1e-9
+        )
+
+    def test_parse_raw_signal_file(self, tmp_path):
+        raw_path = tmp_path / CMBX_SIGNAL_RAW
+        raw_path.write_bytes(_read_cmbx_member(CMBX_SIGNAL_RAW))
+
+        chrom = parse_chromeleon_raw(raw_path)
+
+        assert chrom.channel == "FID_left"
+        # raw files store neither the signal unit nor the instrument time zone
+        assert list(chrom.data.columns) == ["Time (min)", "Value"]
+        assert chrom.injection_time == pd.Timestamp("2023-09-07 13:26:11.9873556")
+        cmbx_chrom = parse_chromeleon_cmbx(CMBX_FILE)[0]
+        np.testing.assert_array_equal(
+            chrom.data["Value"].to_numpy(), cmbx_chrom.data["Value (pA)"].to_numpy()
+        )
+
+    def test_parse_raw_signal_bytes_with_unit_and_timezone(self):
+        chrom = parse_chromeleon_raw(
+            _read_cmbx_member(CMBX_SIGNAL_RAW),
+            file_name=CMBX_SIGNAL_RAW,
+            channel_name="FID",
+            signal_unit="pA",
+            timezone="Europe/Amsterdam",
+        )
+
+        assert chrom.channel == "FID"
+        assert chrom.path == CMBX_SIGNAL_RAW
+        assert chrom.signal_unit == "pA"
+        assert list(chrom.data.columns) == ["Time (min)", "Value (pA)"]
+        assert chrom.injection_time == pd.Timestamp("2023-09-07 15:26:11.9873556")
+
+    def test_reject_audit_trail_raw_file(self):
+        with pytest.raises(ValueError, match="audit trail"):
+            parse_chromeleon_raw(AUDIT_TRAIL_HEADER)
+
+    def test_reject_unknown_raw_file(self):
+        with pytest.raises(ValueError, match="Not a Chromeleon signal file"):
+            parse_chromeleon_raw(b"not a chromeleon file")
+
+    def test_reject_truncated_raw_file(self):
+        data = _read_cmbx_member(CMBX_SIGNAL_RAW)
+        with pytest.raises(ValueError, match="Invalid length"):
+            parse_chromeleon_raw(data[:-100])
+
+    def test_reject_zip_without_chromeleon_header(self):
+        with pytest.raises(ValueError, match="header.xml"):
+            parse_chromeleon_cmbx(TEST_DATA_DIR / "test_dx.dx")
+
+    def test_missing_cmbx_file(self):
+        with pytest.raises(FileNotFoundError):
+            parse_chromeleon_cmbx(TEST_DATA_DIR / "does_not_exist.cmbx")
+
+    def test_signed_varint_decoding(self):
+        # first byte: [continue][sign][6 bits], then [continue][7 bits]
+        values, terminators = _decode_svarints(
+            bytes([0x05, 0x45, 0xBD, 0xAF, 0xCC, 0x0E, 0xC0, 0x01, 0x40])
+        )
+
+        assert values.tolist() == [5, -5, 15305725, -64, 0]
+        assert terminators.tolist() == [False, False, False, False, True]
+
+
 class TestAutoChromatogramParser:
     """Test parser dispatch for single chromatogram files."""
 
@@ -238,3 +353,24 @@ class TestAutoChromatogramParser:
         file_path = LOG_DATA_DIR / "Log_1.txt"
         with pytest.raises(ValueError):
             parse_chromatogram(file_path)
+
+    def test_parse_chromeleon_cmbx_file(self):
+        chrom = parse_chromatogram(CMBX_FILE)
+
+        assert chrom.channel == "FID_left"
+        assert not chrom.data.empty
+        assert chrom.signal_unit == "pA"
+
+    def test_parse_chromeleon_raw_file(self, tmp_path):
+        raw_path = tmp_path / CMBX_SIGNAL_RAW
+        raw_path.write_bytes(_read_cmbx_member(CMBX_SIGNAL_RAW))
+        chrom = parse_chromatogram(raw_path)
+
+        assert chrom.channel == "FID_left"
+        assert not chrom.data.empty
+
+    def test_reject_chromeleon_audit_trail_raw_file(self, tmp_path):
+        raw_path = tmp_path / "audit.raw"
+        raw_path.write_bytes(AUDIT_TRAIL_HEADER)
+        with pytest.raises(ValueError, match="audit trail"):
+            parse_chromatogram(raw_path)

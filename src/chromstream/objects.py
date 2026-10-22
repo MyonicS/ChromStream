@@ -312,6 +312,10 @@ class Experiment:
                 from .parsers import parse_agilent_ch
 
                 chrom = parse_agilent_ch(chromatogram)
+            elif path.suffix.lower() in (".raw", ".cmbx"):
+                from .parsers import parse_chromatogram
+
+                chrom = parse_chromatogram(chromatogram)
             else:
                 from .parsers import parse_chromatogram_txt
 
@@ -347,6 +351,7 @@ class Experiment:
                 - A list of paths to chromatogram files
                 - A path to a .d directory containing .ch files
                 - A path to a .dx archive containing .ch files
+                - A path to a Chromeleon .cmbx archive
             channel_name: Optional channel name to override for all chromatograms
         """
         # Convert single path to Path object if needed
@@ -362,9 +367,14 @@ class Experiment:
                 from .parsers.agilent import parse_agilent_dx
 
                 chrom_list = parse_agilent_dx(path)
+            # Check if it's a Chromeleon .cmbx archive
+            elif path.is_file() and path.suffix.lower() == ".cmbx":
+                from .parsers.chromeleon_binary import parse_chromeleon_cmbx
+
+                chrom_list = parse_chromeleon_cmbx(path)
             else:
                 raise ValueError(
-                    f"Path must be a .d directory or .dx file. Got: {chromatograms}"
+                    f"Path must be a .d directory, .dx file or .cmbx file. Got: {chromatograms}"
                 )
 
             for chrom in chrom_list:
@@ -375,7 +385,7 @@ class Experiment:
                 self.add_chromatogram(chrom, channel_name=channel_name)
         else:
             raise ValueError(
-                "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory/.dx file"
+                "chromatograms must be a list of Chromatogram objects/paths or a path to a .d directory/.dx/.cmbx file"
             )
 
     def to_hdf5(

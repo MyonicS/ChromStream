@@ -16,6 +16,7 @@ Future agents should treat this as a scientific data library first, not a generi
 - `src/chromstream/objects.py`: core dataclasses: `Chromatogram`, `ChannelChromatograms`, `Experiment`.
 - `src/chromstream/data_processing.py`: baseline correction registry, integration helpers, log merging, chromatogram splitting.
 - `src/chromstream/parsers/chromeleon.py`: Chromeleon `.txt` parsing and injection-time parsing.
+- `src/chromstream/parsers/chromeleon_binary.py`: Chromeleon 7 `.cmbx` archive and raw signal file (`SignHdr`) parsing; the module docstring documents the reverse-engineered binary format.
 - `src/chromstream/parsers/agilent.py`: Agilent `.ch`, `.d`, and `.dx` parsing.
 - `src/chromstream/parsers/dispatch.py`: single-file parser dispatch for supported chromatogram files.
 - `src/chromstream/parsers/hdf5.py`: strict parsers for ChromStream HDF5 experiment, channel, and chromatogram files.
@@ -49,14 +50,17 @@ Many methods rely on column order rather than column names. Do not reorder colum
 - `parse_chromatogram(path)` in `parsers/dispatch.py` currently supports:
   - Agilent `.ch`
   - Chromeleon `.txt` only when the file content matches expected chromatogram metadata
+  - Chromeleon `.raw` signal files and `.cmbx` archives containing exactly one signal
 - `parse_experiment_hdf5(path)`, `parse_channel_hdf5(path)`, and `parse_chromatogram_hdf5(path)` read the experiment, channel, and chromatogram HDF5 formats respectively. Each accepts only its exact schema (`chromstream-experiment/v0.1.0`, `chromstream-channel/v0.1.0`, `chromstream-chromatogram/v0.1.0`); schema strings live as `SCHEMA_*` constants in `objects.py`.
 - The HDF5 parsers verify that the file is a ChromStream HDF5 file before attempting schema-specific parsing (shared `_require_schema` gate in `hdf5_common.py`).
 - `Experiment.add_chromatogram(...)` does not use the dispatch helper for all formats:
   - `.ch` goes to `parse_agilent_ch`
+  - `.raw` and `.cmbx` go to `parse_chromatogram`
   - all other file paths currently go to `parse_chromatogram_txt`
 - `Experiment.add_mult_chromatograms(...)` supports:
   - Agilent `.d` directories
   - Agilent `.dx` archives
+  - Chromeleon `.cmbx` archives
   - lists of paths or `Chromatogram` objects
 - `other_files.py` contains additional parsers for:
   - MTO ASCII chromatogram exports
@@ -104,7 +108,7 @@ Fallback without `uv`:
 Baseline status at the time this file was written:
 
 - `uv run pytest` passes
-- 72 tests passing
+- 88 tests passing
 
 ## Testing Expectations
 

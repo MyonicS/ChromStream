@@ -234,3 +234,18 @@ class TestExperimentBasics:
         assert len(exp.channels) > 0
         total_chroms = sum(len(channel.chromatograms) for channel in exp.channels.values())
         assert total_chroms > 0
+
+    def test_experiment_add_mult_chromatograms_from_cmbx(self):
+        """Test adding all signals of a Chromeleon .cmbx archive"""
+        exp = Experiment(name="Test")
+        exp.add_mult_chromatograms(TEST_DATA_DIR / "chromeleon.cmbx")
+
+        assert exp.channel_names == ["FID_left"]
+        assert len(exp.channels["FID_left"].chromatograms) == 1
+
+    def test_experiment_add_chromatogram_from_cmbx(self):
+        """Test adding a single-signal Chromeleon .cmbx archive"""
+        exp = Experiment(name="Test")
+        exp.add_chromatogram(TEST_DATA_DIR / "chromeleon.cmbx")
+
+        assert exp.channel_names == ["FID_left"]

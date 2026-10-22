@@ -6,6 +6,7 @@ from chromstream.objects import Chromatogram
 
 from .agilent import parse_agilent_ch
 from .chromeleon import parse_chromatogram_txt
+from .chromeleon_binary import parse_chromeleon_cmbx, parse_chromeleon_raw
 
 
 def _is_chromeleon_txt(path: Path) -> bool:
@@ -50,6 +51,9 @@ def parse_chromatogram(path: str | Path) -> Chromatogram:
     Supported:
     - Agilent: .ch
     - Chromeleon: .txt (validated by metadata signature)
+    - Chromeleon: .raw signal files (validated by the `SignHdr` header)
+    - Chromeleon: .cmbx archives containing exactly one signal
+      (use `parse_chromeleon_cmbx` for archives with several signals)
     """
     path = Path(path)
 
@@ -75,6 +79,29 @@ def parse_chromatogram(path: str | Path) -> Chromatogram:
                 f"Failed to parse Chromeleon .txt file '{path}': {e}"
             ) from e
 
+    if suffix == ".raw":
+        try:
+            return parse_chromeleon_raw(path)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse Chromeleon .raw file '{path}': {e}"
+            ) from e
+
+    if suffix == ".cmbx":
+        try:
+            chromatograms = parse_chromeleon_cmbx(path)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse Chromeleon .cmbx file '{path}': {e}"
+            ) from e
+        if len(chromatograms) != 1:
+            raise ValueError(
+                f"Chromeleon archive '{path}' contains {len(chromatograms)} "
+                "chromatograms; use parse_chromeleon_cmbx to parse all of them."
+            )
+        return chromatograms[0]
+
     raise ValueError(
-        f"Unsupported chromatogram file type '{suffix}' for '{path}'. Expected .ch or .txt."
+        f"Unsupported chromatogram file type '{suffix}' for '{path}'. "
+        "Expected .ch, .txt, .raw or .cmbx."
     )
