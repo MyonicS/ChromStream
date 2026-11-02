@@ -307,18 +307,14 @@ class Experiment:
 
         """
         if isinstance(chromatogram, (str, Path)):
-            path = Path(chromatogram)
-            if path.suffix.lower() == ".ch":
-                from .parsers import parse_agilent_ch
+            from .parsers import parse_chromatogram
 
-                chrom = parse_agilent_ch(chromatogram)
-            else:
-                from .parsers import parse_chromatogram_txt
-
-                try:
-                    chrom = parse_chromatogram_txt(chromatogram)
-                except Exception as e:
-                    raise ValueError(f"Failed to parse chromatogram: {e}")
+            try:
+                chrom = parse_chromatogram(chromatogram)
+            except FileNotFoundError:
+                raise
+            except Exception as e:
+                raise ValueError(f"Failed to parse chromatogram: {e}") from e
         elif isinstance(chromatogram, Chromatogram):
             chrom = chromatogram
         else:
@@ -347,6 +343,8 @@ class Experiment:
                 - A list of paths to chromatogram files
                 - A path to a .d directory containing .ch files
                 - A path to a .dx archive containing .ch files
+                - A path to any other chromatogram file, e.g. a Chromeleon
+                  .cmbx archive (all its injections and signals)
             channel_name: Optional channel name to override for all chromatograms
         """
         # Convert single path to Path object if needed
@@ -362,10 +360,18 @@ class Experiment:
                 from .parsers.agilent import parse_agilent_dx
 
                 chrom_list = parse_agilent_dx(path)
+            # Any other chromatogram file, e.g. a Chromeleon .cmbx archive
             else:
-                raise ValueError(
-                    f"Path must be a .d directory or .dx file. Got: {chromatograms}"
-                )
+                from .parsers import parse_chromatograms
+
+                try:
+                    chrom_list = parse_chromatograms(path)
+                except FileNotFoundError:
+                    raise
+                except Exception as e:
+                    raise ValueError(
+                        f"Could not parse chromatograms from {chromatograms}: {e}"
+                    ) from e
 
             for chrom in chrom_list:
                 self.add_chromatogram(chrom, channel_name=channel_name)

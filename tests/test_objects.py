@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import pytest
 from pathlib import Path
 from chromstream.objects import ChannelChromatograms, Experiment
 from chromstream.parsers import parse_chromatogram_txt
@@ -234,3 +235,24 @@ class TestExperimentBasics:
         assert len(exp.channels) > 0
         total_chroms = sum(len(channel.chromatograms) for channel in exp.channels.values())
         assert total_chroms > 0
+
+    def test_experiment_add_mult_chromatograms_from_other_format(self, tmp_path):
+        """Files without a dedicated parser are read through chromparser"""
+        import chromparser
+
+        injection = chromparser.read_one(TEST_DATA_DIR / "agilent.d")
+        chromparser.write_andi(injection, tmp_path)
+        exp = Experiment(name="Test")
+
+        for cdf in sorted(tmp_path.glob("*.cdf")):
+            exp.add_mult_chromatograms(cdf)
+
+        assert sorted(exp.channel_names) == ["FID1A", "FID2B", "TCD3C"]
+
+    def test_experiment_add_chromatogram_rejects_log_file(self):
+        """Non-chromatogram files still raise ValueError"""
+        exp = Experiment(name="Test")
+        log_file = TEST_DATA_DIR.parent / "logs" / "Log_1.txt"
+
+        with pytest.raises(ValueError, match="Failed to parse chromatogram"):
+            exp.add_chromatogram(log_file)

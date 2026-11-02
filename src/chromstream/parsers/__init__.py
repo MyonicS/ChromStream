@@ -6,7 +6,7 @@ from .chromeleon import (
     parse_chromatogram_txt,
     parse_to_channel,
 )
-from .dispatch import parse_chromatogram
+from .dispatch import parse_chromatogram, parse_chromatograms
 from .hdf5 import (
     parse_channel_hdf5,
     parse_chromatogram_hdf5,

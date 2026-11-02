@@ -1,230 +1,141 @@
-import pandas as pd
-import re
+from __future__ import annotations
+
 import logging as log
+import re
 from pathlib import Path
-from chromstream.objects import Chromatogram
-from chromstream.objects import ChannelChromatograms
 from typing import Optional
+
+import chromparser
+import pandas as pd
+from chromparser.vendors.chromeleon import read_chromeleon_txt
+from chromparser.vendors.chromeleon.txt import parse_inject_time as _parse_inject_time
+
+from chromstream.objects import ChannelChromatograms, Chromatogram
+
+from ._chromparser import to_chromatograms, to_timestamp
+
+
+def _read_header(path: Path) -> dict[str, str]:
+    """
+    Read the raw ``key: value`` header of a Chromeleon text export.
+
+    Kept for backwards compatibility: these are the metadata keys (as written
+    by Chromeleon) that ChromStream exposed before switching to chromparser.
+    """
+    data = path.read_bytes()
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("cp1252")
+
+    metadata = {}
+    metadata_pattern = re.compile(r"^(?P<key>[^\t]+?)\s*[:\t]\s*(?P<value>.+)$")
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("Chromatogram Data:"):
+            break
+        match = metadata_pattern.match(line)
+        if match:
+            metadata[match.group("key").strip()] = match.group("value").strip()
+    return metadata
+
+
+def _read_chromeleon_txt(
+    file_path: str | Path, dayfirst: bool = True
+) -> tuple[chromparser.Injection, dict[str, str]]:
+    """Read a Chromeleon text export with chromparser, plus its raw header."""
+    path = Path(file_path)
+    (injection,) = read_chromeleon_txt(path, dayfirst=dayfirst)
+    return injection, _read_header(path)
 
 
 def parse_chromeleon_txt(
-    file_path: str | Path,
-) -> tuple[dict[str, str], pd.DataFrame]:
+    file_path: str | Path, dayfirst: bool = True
+) -> tuple[dict, pd.DataFrame]:
     """
-    Parses a txt file exporeted using chromeleon software into a dict of metadata and pd.DataFrame for chromatogram data.
+    Parses a txt file exported using Chromeleon software into a dict of metadata and a pd.DataFrame for chromatogram data.
+
+    Reading is done by chromparser. The metadata contains the header keys as
+    written by Chromeleon (e.g. ``"Signal Unit"``, ``"Channel"``), the parsed
+    ``"Inject Time"`` as a naive `pd.Timestamp`, ``"time_unit"`` and the
+    normalised snake_case keys of chromparser.
 
     Args:
         file_path (str | Path): Path to the chromatogram file.
+        dayfirst (bool): Day/month order for ambiguous dates. Defaults to True.
 
     Returns:
-        Tuple[Dict[str, str], pd.DataFrame]: A tuple containing metadata and chromatogram data as a DataFrame.
+        tuple[dict, pd.DataFrame]: Metadata and chromatogram data with columns
+        ``"Time (min)"`` and ``"Value (<signal unit>)"``.
     """
-    metadata = {}
-    chromatogram_data_start = None
-
-    with open(file_path, "r") as file:
-        lines = file.readlines()
-
-    # Regular expression to match metadata lines
-    metadata_pattern = re.compile(r"^(?P<key>[^\t]+?)\s*[:\t]\s*(?P<value>.+)$")
-
-    # Parse metadata
-    metadata_section = True
-    for i, line in enumerate(lines):
-        line = line.strip()
-        if not line:
-            continue
-        if metadata_section:
-            if line.startswith("Chromatogram Data:"):
-                chromatogram_data_start = i + 2  # Skip the header line
-                metadata_section = False
-                continue
-            match = metadata_pattern.match(line)
-            if match:
-                key = match.group("key").strip()
-                value = match.group("value").strip()
-                metadata[key] = value
-        else:
-            break
-
-    # adding injection time as datetime object
-    # Note: Some files use "Inject Time", others "Injection Time"
-    inject_time_key = None
-    if "Inject Time" in metadata:
-        inject_time_key = "Inject Time"
-    elif "Injection Time" in metadata:
-        inject_time_key = "Injection Time"
-
-    if inject_time_key is None:
-        log.warning("Inject Time or Injection Time is missing from the metadata.")
-    else:
-        try:
-            metadata["Inject Time"] = parse_inject_time(
-                metadata[inject_time_key], metadata
-            )
-        except Exception as e:
-            log.warning(f"Failed to parse '{inject_time_key}': {e}")
-
-    # getting signal unit
-    if "Signal Unit" not in metadata:
-        log.warning("Signal Unit is missing from the metadata.")
-        signal_unit = "unknown"
-    else:
-        signal_unit = metadata["Signal Unit"]
-
-    # reading chromatogram data
-    if chromatogram_data_start is not None:
-        # Check first data line to determine number format
-        with open(file_path, "r") as f:
-            lines = f.readlines()
-
-        first_data_line = lines[chromatogram_data_start].strip()
-        comma_decimal_format = "," in first_data_line
-
-        if comma_decimal_format:
-            # European format: comma as decimal, dot as thousands
-            converters = {
-                "Time (min)": lambda x: float(str(x).replace(".", "").replace(",", "."))
-                if pd.notna(x) and x != ""
-                else float("nan"),
-                f"Value ({signal_unit})": lambda x: float(
-                    str(x).replace(".", "").replace(",", ".")
-                )
-                if pd.notna(x) and x != ""
-                else float("nan"),
-            }
-        else:
-            # Standard format: dot as decimal, comma as thousands
-            converters = {
-                "Time (min)": lambda x: float(str(x).replace(",", ""))
-                if pd.notna(x) and x != ""
-                else float("nan"),
-                f"Value ({signal_unit})": lambda x: float(str(x).replace(",", ""))
-                if pd.notna(x) and x != ""
-                else float("nan"),
-            }
-
-        chromatogram_df = pd.read_csv(
-            file_path,
-            sep="\t",
-            skiprows=chromatogram_data_start,
-            names=["Time (min)", "Step (s)", f"Value ({signal_unit})"],
-            na_values=["n.a."],
-            usecols=["Time (min)", f"Value ({signal_unit})"],
-            converters=converters,
-        )
-        # adding time units to metadata
-        metadata["time_unit"] = "min"
-    else:
-        log.warning(f"Chromatogram data section not found for {file_path}.")
-        chromatogram_df = pd.DataFrame()
-
-    # adding time unit to the metadata
-
-    return metadata, chromatogram_df
+    chrom = parse_chromatogram_txt(file_path, dayfirst=dayfirst)
+    return chrom.metadata, chrom.data
 
 
 def parse_inject_time(
     inject_time: str, metadata: dict, dayfirst: bool = True
 ) -> pd.Timestamp:
     """
-    Parses the injeciton time for chromeleon txt files into a pd.Timestamp object.
-    The file most likely adopts the datatime format of the machine, meaning it can be very different between machines.
-    In some formats, the date is saved seperatly from the datatime, and needs to be combined.
+    Parses the injection time of a Chromeleon txt file into a pd.Timestamp object.
+
+    The format follows the locale of the exporting computer. Day/month order
+    is read from the data when one component is >12, and dates with an AM/PM
+    time are month first (US locale); otherwise `dayfirst` decides. When only a time is
+    given, the date is taken from ``metadata["Injection Date"]``. Parsing is
+    done by chromparser; any UTC offset is dropped, keeping the local wall time.
 
     Args:
-        inject_time (pd.Timestamp): The Inject Time timestamp to parse.
-        metadata (dict): Metadata dictionary containing additional information.
-        dayfirst (bool): Default day/month order used only when the date is
-            genuinely ambiguous (both components <=12) and can't be resolved
-            from the data itself. Defaults to True.
+        inject_time (str): The Inject Time string to parse.
+        metadata (dict): Metadata dictionary, used for ``"Injection Date"``.
+        dayfirst (bool): Day/month order used only when the date is genuinely
+            ambiguous. Defaults to True.
 
     Returns:
-        pd.Timestamp: Parsed datetime object.
+        pd.Timestamp: Parsed, timezone-naive timestamp.
+
+    Raises:
+        ValueError: If the time cannot be parsed.
     """
-    # Full date+time string, e.g. '7/17/2023 3:35:22 PM +02:00',
-    # '17-1-2023 16:45:42 +01:00', '17/07/2023 15:35:22 +0200'.
-    # Day/month order depends on the exporting machine's OS locale. Where one
-    # of the two components is >12 the order is unambiguous and can be read
-    # straight from the data instead of guessed; only fall back to the
-    # configured `dayfirst` default when both components are <=12.
-    date_match = re.match(r"(\d{1,2})[/-](\d{1,2})[/-]\d{4}", inject_time)
-    if date_match:
-        first, second = int(date_match.group(1)), int(date_match.group(2))
-        if first > 12:
-            resolved_dayfirst = True
-        elif second > 12:
-            resolved_dayfirst = False
-        else:
-            resolved_dayfirst = dayfirst
-        parsed = pd.to_datetime(inject_time, dayfirst=resolved_dayfirst)
-        return parsed.tz_localize(None) if parsed.tzinfo is not None else parsed
-
-    # Check for format like '1:43:35 PM' and require metadata for the date
-    if re.match(r"\d{1,2}:\d{2}:\d{2} (AM|PM)", inject_time):
-        if "Injection Date" in metadata:
-            injection_date = metadata["Injection Date"]
-            combined_datetime = f"{injection_date} {inject_time}"
-            return pd.to_datetime(combined_datetime, format="%m/%d/%Y %I:%M:%S %p")
-        else:
-            raise ValueError(
-                "Injection Date is missing from metadata for AM/PM time format."
-            )
-
-    # Check for format like '10:30:07' (24-hour) and require metadata for the date
-    if re.match(r"\d{2}:\d{2}:\d{2}$", inject_time):
-        if "Injection Date" in metadata:
-            injection_date = metadata["Injection Date"]
-            # Check if date is in format like '22-Aug-25'
-            if re.match(r"\d{1,2}-[A-Za-z]{3}-\d{2}", injection_date):
-                combined_datetime = f"{injection_date} {inject_time}"
-                return pd.to_datetime(combined_datetime, format="%d-%b-%y %H:%M:%S")
-            # Check if date is in format like '12/19/2023'
-            elif re.match(r"\d{1,2}/\d{1,2}/\d{4}", injection_date):
-                combined_datetime = f"{injection_date} {inject_time}"
-                return pd.to_datetime(combined_datetime, format="%m/%d/%Y %H:%M:%S")
-            else:
-                raise ValueError(
-                    f"Unrecognized Injection Date format: {injection_date}"
-                )
-        else:
-            raise ValueError(
-                "Injection Date is missing from metadata for time-only Inject Time."
-            )
-    else:
-        try:
-            # Attempt to parse as ISO 8601 format
-            # dayfirst is treated as default.
-            time = pd.to_datetime(inject_time, dayfirst=dayfirst).tz_localize(None)
-            log.info(f"Time format not handled, but succeeded parsing with: {time}")
-            return time
-        except Exception:
-            pass
-    raise ValueError(f"Unrecognized Inject Time format: {inject_time}")
+    parsed = _parse_inject_time(inject_time, metadata.get("Injection Date"), dayfirst)
+    return pd.Timestamp(parsed.replace(tzinfo=None))
 
 
-def parse_chromatogram_txt(path: str | Path) -> Chromatogram:
+def parse_chromatogram_txt(path: str | Path, dayfirst: bool = True) -> Chromatogram:
     """
-    Parses a txt file exported using chromeleon software into a Chromatogram object.
+    Parses a txt file exported using Chromeleon software into a Chromatogram object.
 
     Args:
         path (str | Path): Path to the chromatogram file.
+        dayfirst (bool): Day/month order for ambiguous dates. Defaults to True.
 
     Returns:
         Chromatogram: Parsed Chromatogram object.
-    """
-    metadata, df = parse_chromeleon_txt(path)
-    injection_time = pd.Timestamp(metadata["Inject Time"])
-    channel = metadata.get("Channel", "unknown")
-    path = Path(path)
 
-    return Chromatogram(
-        data=df,
-        injection_time=injection_time,
-        metadata=metadata,
-        channel=channel,
-        path=path,
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If the file is not a Chromeleon chromatogram export or has
+            no parsable injection time.
+    """
+    path = Path(path)
+    injection, header = _read_chromeleon_txt(path, dayfirst=dayfirst)
+
+    def legacy(_signal: chromparser.Signal) -> dict:
+        metadata = dict(header)
+        metadata["Inject Time"] = injection_time
+        return metadata
+
+    signal = next(iter(injection.signals.values()))
+    injection_time = to_timestamp(injection, signal)
+    (chrom,) = to_chromatograms(
+        injection,
+        "chromeleon-txt",
+        path,
+        legacy_metadata=legacy,
+        channel_name=header.get("Channel", "unknown"),
     )
+    return chrom
 
 
 def parse_to_channel(
