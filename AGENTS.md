@@ -15,9 +15,10 @@ Future agents should treat this as a scientific data library first, not a generi
 - `src/chromstream/__init__.py`: top-level package exports via star imports.
 - `src/chromstream/objects.py`: core dataclasses: `Chromatogram`, `ChannelChromatograms`, `Experiment`.
 - `src/chromstream/data_processing.py`: baseline correction registry, integration helpers, log merging, chromatogram splitting.
-- `src/chromstream/parsers/chromeleon.py`: Chromeleon `.txt` parsing and injection-time parsing.
-- `src/chromstream/parsers/agilent.py`: Agilent `.ch`, `.d`, and `.dx` parsing.
-- `src/chromstream/parsers/dispatch.py`: single-file parser dispatch for supported chromatogram files.
+- `src/chromstream/parsers/_chromparser.py`: conversion of chromparser `Injection` objects to `Chromatogram`s.
+- `src/chromstream/parsers/chromeleon.py`: Chromeleon `.txt` parsing and injection-time parsing (via chromparser).
+- `src/chromstream/parsers/agilent.py`: Agilent `.ch`, `.d`, and `.dx` parsing (via chromparser).
+- `src/chromstream/parsers/dispatch.py`: content-based dispatch (`parse_chromatogram`, `parse_chromatograms`).
 - `src/chromstream/parsers/hdf5.py`: strict parsers for ChromStream HDF5 experiment, channel, and chromatogram files.
 - `src/chromstream/parsers/other_files.py`: MTO ASCII parser and several log-file parsers.
 - `src/chromstream/hdf5_common.py`: shared HDF5 helpers (scalar converters, schema gate, reserved-attr sets, per-channel/per-chromatogram group read/write) reused by the writer and parser.
@@ -46,23 +47,18 @@ Many methods rely on column order rather than column names. Do not reorder colum
 
 ### Parsing surface
 
-- `parse_chromatogram(path)` in `parsers/dispatch.py` currently supports:
-  - Agilent `.ch`
-  - Chromeleon `.txt` only when the file content matches expected chromatogram metadata
+- All vendor chromatogram files are read by the external library `chromparser` (https://github.com/MyonicS/chromparser). ChromStream only converts chromparser's `Injection`/`Signal` objects into `Chromatogram`s in `parsers/_chromparser.py` (`to_chromatograms`, `to_timestamp`). Fix file-format bugs in chromparser, not here.
+- Backwards compatibility layer: the vendor modules keep the pre-chromparser function names, DataFrame column names (Chromeleon `"Time (min)"`/`"Value (<unit>)"`, Agilent `"Time"`/`"Signal"`) and legacy metadata keys (raw Chromeleon header keys; Agilent `version`, `Sample Name`, `Method Name`, `date`, ...). chromparser's snake_case keys are added alongside, plus `source_format`, `injection_name` and `sampling_interval_s`. Non-scalar chromparser metadata (e.g. `warnings` lists) is flattened to strings so HDF5 export keeps working.
+- Injection times are naive local wall time: chromparser's UTC offset is dropped. Formats without an inject time fall back to the signal's acquisition start converted to the local time zone.
+- `parse_chromatograms(path, **options)` in `parsers/dispatch.py` detects the format from content (`chromparser.sniff`) and returns all chromatograms; Chromeleon `.txt` and Agilent formats route through their legacy-compatible parsers, everything else through `to_chromatograms`. `parse_chromatogram(path)` wraps it and requires exactly one chromatogram.
+- `Experiment.add_chromatogram(...)` uses `parse_chromatogram`; `Experiment.add_mult_chromatograms(...)` handles `.d`/`.dx` explicitly and any other path via `parse_chromatograms`.
 - `parse_experiment_hdf5(path)`, `parse_channel_hdf5(path)`, and `parse_chromatogram_hdf5(path)` read the experiment, channel, and chromatogram HDF5 formats respectively. Each accepts only its exact schema (`chromstream-experiment/v0.1.0`, `chromstream-channel/v0.1.0`, `chromstream-chromatogram/v0.1.0`); schema strings live as `SCHEMA_*` constants in `objects.py`.
 - The HDF5 parsers verify that the file is a ChromStream HDF5 file before attempting schema-specific parsing (shared `_require_schema` gate in `hdf5_common.py`).
-- `Experiment.add_chromatogram(...)` does not use the dispatch helper for all formats:
-  - `.ch` goes to `parse_agilent_ch`
-  - all other file paths currently go to `parse_chromatogram_txt`
-- `Experiment.add_mult_chromatograms(...)` supports:
-  - Agilent `.d` directories
-  - Agilent `.dx` archives
-  - lists of paths or `Chromatogram` objects
-- `other_files.py` contains additional parsers for:
+- `other_files.py` (not chromparser-based) contains additional parsers for:
   - MTO ASCII chromatogram exports
   - several log file formats
 
-If you add a new chromatogram format, update the parser, the dispatch layer, and the `Experiment` helpers together.
+If chromparser gains a new format, it is available through `parse_chromatograms` automatically; add a dedicated ChromStream parser only if legacy conventions are needed.
 
 ### Processing surface
 
@@ -104,7 +100,7 @@ Fallback without `uv`:
 Baseline status at the time this file was written:
 
 - `uv run pytest` passes
-- 72 tests passing
+- 95 tests passing
 
 ## Testing Expectations
 
@@ -127,7 +123,7 @@ For new file-format support, include at least:
 ## Code Conventions
 
 - The package uses a `src/` layout.
-- Python support target is `>=3.9`.
+- Python support target is `>=3.10` (chromparser's minimum).
 - Ruff, Black-style formatting, mypy, and pyright settings live in `pyproject.toml`.
 - Tests run with `pythonpath = "src"` and `--import-mode=importlib`.
 - `from __future__ import annotations` is standard across modules.
@@ -155,10 +151,8 @@ For new file-format support, include at least:
 Common future changes and the files they usually require:
 
 - New chromatogram file format:
-  - parser module under `src/chromstream/parsers/`
-  - `src/chromstream/parsers/__init__.py`
-  - `src/chromstream/parsers/dispatch.py`
-  - `src/chromstream/objects.py` if `Experiment` helpers should auto-detect it
+  - add it to chromparser; it is then picked up by `parse_chromatograms`
+  - a dedicated module under `src/chromstream/parsers/` only if it needs special column or metadata conventions
   - tests and docs
 - New baseline correction:
   - `src/chromstream/data_processing.py`

@@ -10,7 +10,11 @@ from chromstream.parsers import (
     parse_log_file,
     parse_log_MTO,
     parse_agilent_ch,
+    parse_agilent_dot_d,
     parse_agilent_dx,
+    parse_chromatograms,
+    parse_chromeleon_txt,
+    parse_inject_time,
 )
 
 # Test data directories
@@ -238,3 +242,153 @@ class TestAutoChromatogramParser:
         file_path = LOG_DATA_DIR / "Log_1.txt"
         with pytest.raises(ValueError):
             parse_chromatogram(file_path)
+
+
+class TestChromparserBackend:
+    """Parsing through chromparser keeps the earlier ChromStream conventions."""
+
+    def test_chromeleon_txt_legacy_and_chromparser_metadata(self):
+        chrom = parse_chromatogram_txt(TEST_DATA_DIR / "format_2.txt")
+
+        assert list(chrom.data.columns) == ["Time (min)", "Value (pA)"]
+        # raw Chromeleon header keys, without the byte order mark
+        assert chrom.metadata["URL"] == "none"
+        assert chrom.metadata["Channel"] == "FID_right"
+        assert chrom.metadata["Signal Unit"] == "pA"
+        assert chrom.metadata["Inject Time"] == pd.Timestamp("2023-07-17 15:35:22")
+        assert chrom.metadata["time_unit"] == "min"
+        # normalised chromparser keys
+        assert chrom.metadata["data_vault"] == "ChromeleonLocal"
+        assert chrom.metadata["source_format"] == "chromeleon-txt"
+        # UTC offset dropped, local wall time kept
+        assert chrom.injection_time == pd.Timestamp("2023-07-17 15:35:22")
+        assert chrom.injection_time.tzinfo is None
+
+    def test_parse_chromeleon_txt_tuple(self):
+        metadata, df = parse_chromeleon_txt(TEST_DATA_DIR / "format_3.txt")
+
+        assert metadata["Channel"] == "FID_Ch1"
+        assert list(df.columns) == ["Time (min)", "Value (pA)"]
+        assert len(df) == 42000
+
+    @pytest.mark.parametrize(
+        ("text", "metadata", "expected"),
+        [
+            ("7/17/2023 3:35:22 PM +02:00", {}, "2023-07-17 15:35:22"),
+            ("17-1-2023 16:45:42 +01:00", {}, "2023-01-17 16:45:42"),
+            ("1:43:35 PM", {"Injection Date": "12/19/2023"}, "2023-12-19 13:43:35"),
+            ("10:30:07", {"Injection Date": "22-Aug-25"}, "2025-08-22 10:30:07"),
+            ("5/6/2024 10:00:00", {}, "2024-06-05 10:00:00"),
+            # AM/PM is the US locale: month first (confirmed by a .cmbx archive)
+            ("9/7/2023 3:26:11 PM +02:00", {}, "2023-09-07 15:26:11"),
+            ("12/19/2023 1:43:35 PM", {}, "2023-12-19 13:43:35"),
+        ],
+    )
+    def test_parse_inject_time(self, text, metadata, expected):
+        assert parse_inject_time(text, metadata) == pd.Timestamp(expected)
+
+    def test_parse_inject_time_monthfirst(self):
+        parsed = parse_inject_time("5/6/2024 10:00:00", {}, dayfirst=False)
+        assert parsed == pd.Timestamp("2024-05-06 10:00:00")
+
+    def test_parse_inject_time_needs_date(self):
+        with pytest.raises(ValueError, match="Injection Date"):
+            parse_inject_time("10:30:07", {})
+
+    def test_missing_file(self):
+        with pytest.raises(FileNotFoundError):
+            parse_chromatogram_txt(TEST_DATA_DIR / "missing.txt")
+        with pytest.raises(FileNotFoundError):
+            parse_chromatogram(TEST_DATA_DIR / "missing.ch")
+
+    def test_agilent_legacy_metadata(self):
+        chrom = parse_agilent_ch(TEST_DATA_DIR / "agilent.d" / "FID1A.ch")
+
+        assert list(chrom.data.columns) == ["Time", "Signal"]
+        assert chrom.metadata["version"] == "179"
+        assert chrom.metadata["Sample Name"] == "Cuatro"
+        assert chrom.metadata["Method Name"] == "GLYREACTION.M"
+        assert chrom.metadata["date"] == "14-Jan-26, 11:49:50"
+        assert chrom.signal_unit == "pA"
+        assert chrom.injection_time == pd.Timestamp("2026-01-14 11:49:50")
+
+    def test_agilent_ch_file_like(self):
+        path = TEST_DATA_DIR / "agilent.d" / "FID1A.ch"
+        with open(path, "rb") as f:
+            from_stream = parse_agilent_ch(f, file_name="FID1A.ch")
+
+        from_path = parse_agilent_ch(path)
+        assert from_stream.channel == "FID1A"
+        assert from_stream.path == "FID1A.ch"
+        pd.testing.assert_frame_equal(from_stream.data, from_path.data)
+
+    def test_agilent_dot_d(self):
+        chroms = parse_agilent_dot_d(TEST_DATA_DIR / "agilent.d")
+
+        assert [c.channel for c in chroms] == ["FID1A", "FID2B", "TCD3C"]
+        assert [Path(c.path).name for c in chroms] == [
+            "FID1A.ch",
+            "FID2B.ch",
+            "TCD3C.ch",
+        ]
+        assert chroms[2].signal_unit == "25 µV"
+
+    def test_agilent_dx_channel_names(self):
+        (chrom,) = parse_agilent_dx(TEST_DATA_DIR / "test_dx.dx")
+
+        assert chrom.channel == "RID1A"
+        assert chrom.signal_unit == "nRIU"
+        assert chrom.metadata["detector"] == "RID"
+        assert chrom.injection_time.tzinfo is None
+
+    @pytest.mark.parametrize(
+        ("name", "count"),
+        [("format_1.txt", 1), ("agilent.d", 3), ("test_dx.dx", 1)],
+    )
+    def test_parse_chromatograms(self, name, count):
+        chroms = parse_chromatograms(TEST_DATA_DIR / name)
+        assert len(chroms) == count
+
+    def test_parse_chromatograms_rejects_unknown(self):
+        with pytest.raises(ValueError):  # noqa: PT011
+            parse_chromatograms(LOG_DATA_DIR / "Log_1.txt")
+
+    def test_parse_chromatograms_other_format(self, tmp_path):
+        """Formats without a dedicated ChromStream parser go through chromparser."""
+        import chromparser
+
+        (injection,) = chromparser.read(TEST_DATA_DIR / "agilent.d" / "FID1A.ch")
+        (cdf,) = chromparser.write_andi(injection, tmp_path)
+
+        (chrom,) = parse_chromatograms(cdf)
+        assert chrom.metadata["source_format"] == "andi-chrom"
+        assert chrom.data.columns[0] == "Time (min)"
+        assert chrom.signal_unit == "pA"
+        assert chrom.injection_time == pd.Timestamp("2026-01-14 11:49:50")
+        assert len(chrom.data) == 29200
+
+        # single-chromatogram files also work with the single-file dispatcher
+        assert parse_chromatogram(cdf).channel == chrom.channel
+
+    def test_parse_chromatogram_rejects_folder(self):
+        with pytest.raises(FileNotFoundError):
+            parse_chromatogram(TEST_DATA_DIR / "agilent.d")
+
+    def test_list_metadata_is_scalar_for_hdf5(self, tmp_path):
+        import chromparser
+
+        from chromstream.parsers import parse_chromatogram_hdf5
+        from chromstream.parsers._chromparser import to_chromatograms
+
+        (injection,) = chromparser.read(TEST_DATA_DIR / "format_1.txt")
+        injection.metadata["warnings"] = ["first", "second"]
+        injection.metadata["nested"] = {"a": 1}
+        (chrom,) = to_chromatograms(injection, "chromeleon-txt", None)
+
+        assert chrom.metadata["warnings"] == "first; second"
+        assert chrom.metadata["nested"] == '{"a": 1}'
+        chrom.to_hdf5(tmp_path / "chrom.h5")
+        assert (
+            parse_chromatogram_hdf5(tmp_path / "chrom.h5").metadata["warnings"]
+            == "first; second"
+        )
